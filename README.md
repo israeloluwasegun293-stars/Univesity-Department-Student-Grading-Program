@@ -9,8 +9,9 @@ The biggest technical challenge faced was implementing the GPA calculation logic
 
 ## How to run the program
 To run the program, follow these steps:
-1. Clone the repository to your local machine.
-2. Open a terminal and navigate to the project directory.
-3. Run the command `go run main.go` to start the program.
+1. You should have Go installed on your machine. You can download it from the official website: https://golang.org/dl/
+2. Clone the repository to your local machine.
+3. Open a terminal and navigate to the project directory.
+4. Run the command `go run main.go` to start the program.
 
 *Program was written by [Okunade Israel Oluwasegun]*
