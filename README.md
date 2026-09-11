@@ -1,8 +1,36 @@
 # ClassEdge — University CGPA Grading System (Web Edition)
 
-A university department grading system that computes **accurate, per-course CGPA** on the standard 100-point breakdown / 5.0 scale, for **one student or a whole class**, and presents everything on an animated dashboard with a nicely formatted, printable class report. Backend in **Go** (stdlib only), frontend in vanilla HTML/CSS/JS — both compiled into a single self-contained binary.
+A university department grading system that computes a **true, weighted, cumulative CGPA** — every course carries its **credit units**, every course is graded on the standard 100-point breakdown, and the cumulative CGPA is derived from running **Total Quality Points ÷ Total Credit Units** across semesters. It handles one student or a whole class, shows a nicely formatted printable report, and ships as a single self-contained Go binary with an animated dashboard.
 
-## Grading scale — standard 100-point breakdown
+## Why this is a *real* CGPA calculator
+
+A CGPA calculator cannot just average raw percentages. ClassEdge implements the academic rules:
+
+**1. Weighted calculations (Quality Points).** Each course collects **code, credit units (1–6) and score (0–100)**. Per course:
+
+```
+GradePoint  = f(score)        // standard 100-point breakdown
+QualityPts  = CreditUnits × GradePoint
+```
+
+An A in a 4-unit course (20 QP) carries double the weight of an A in a 2-unit course (10 QP).
+
+**2. Semester GPA vs Cumulative CGPA.**
+
+```
+Semester GPA = Σ QualityPoints / Σ CreditUnits          (this submission)
+CGPA         = Σ (ALL Quality Points) / Σ (ALL Credit Units)   (cumulative)
+```
+
+The cumulative CGPA is **never** the average of semester GPAs. Example: 20 prior CU with TQP 100 (GPA 5.00), then a failed 2-unit course (0 QP): CGPA = 100/22 = **4.55** — averaging GPAs would wrongly give 2.50.
+
+**3. Fails still count.** An F contributes 0 quality points but its credit units stay in the denominator — that is what drags a GPA down.
+
+**4. Carryovers / repeats.** Both attempts stay on the record by default (the common public-university rule): pass the retake and the old F still counts. The API also exposes an `EffectiveCGPA` best-attempt variant for institutions with a replacement policy.
+
+**5. Input validation.** Scores outside 0–100, credit units outside 1–6, negative/blank fields, inconsistent prior totals (QP without CU, QP > 5.0 × CU) are all rejected server-side with precise messages.
+
+### Grading scale (standard 100-point breakdown, 5.0 system)
 
 | Score range | Letter | Grade point | Remark    |
 |-------------|--------|-------------|-----------|
@@ -13,105 +41,87 @@ A university department grading system that computes **accurate, per-course CGPA
 | 40 – 44%    | E      | 1.0         | Low Pass  |
 | 0 – 39%     | F      | 0.0         | Fail      |
 
-**Why the GPA calculation is accurate:** every course score is graded *individually* and the student's CGPA is the **mean of the per-course grade points** — the standard CGPA method. Example: scores 85 (→A, 5 pts) and 65 (→B, 4 pts) give CGPA = (5+4)/2 = **4.50**. Grading the 75% average alone would give A → 5.00, which is inflated and wrong.
+**Worked example** — 85 in a 4-unit course, 65 in a 2-unit course:
+85 → A (5.0) × 4 = 20 QP · 65 → B (4.0) × 2 = 8 QP → CGPA = 28 ÷ 6 = **4.67** ✅ (a flat grade-point average would say 4.50, ignoring that the A came in a course worth double the units).
 
 ## Features
 
-- **Landing page** (`/`) explaining what the system is for: features, the full grading scale with a worked example, and how the 3-step workflow runs.
-- **Batch grading** (`/app`): choose how many students you're calculating for (1–100), get a form per student with **live per-course grade chips** as you type, then reveal everything at once.
-- **Formatted class report**: a monospace, department-results-sheet style table for all students + class metrics — with **Copy** and **Print** buttons.
-- **Per-course honesty**: each course shows its own letter grade and grade point, and the CGPA is derived from them.
-- **Class metrics**: students graded, class average CGPA, highest/lowest averages, A–F distribution chart, leaderboard.
-- **Confetti** when the batch contains an A student. Results should be fun.
-- Original console mode preserved: `go run . -console` (also asks for the student count now).
+- **Landing page** (`/`) explaining the system: features, the grading scale with a worked weighted example, and the 3-step workflow.
+- **Batch wizard** (`/app`): choose how many students (1–100), a form per student with **per-course rows** (code + credit units + score), a **carry-over toggle** for previous ΣQP/ΣCU, and **live weighted preview chips** (`A·B·A → GPA 4.67`).
+- **Formatted class report** (TCU / TQP / AVG% / GRADE / CGPA columns) with Copy and Print buttons — shared with console mode so both output identically.
+- **Per-course working** renderer (`FormatCourseBreakdown`) showing each course's CU × GP = QP.
+- **Class metrics**: count, highest/lowest averages, highest/lowest CGPA, class mean CGPA, A–F distribution, leaderboard.
+- **Confetti** for A students. Console mode preserved: `go run . -console`.
 
 ## Project structure
 
 ```
-main.go               entrypoint: flags, hardened http.Server, embed + global headers
-console.go            original terminal experience (-console flag)
-grading/              core academic logic — the single source of truth
-  grading.go            per-course grade points, CGPA, band labels, class metrics
-  report.go             formatted class report renderer (shared web + console)
+main.go               entrypoint: flags, hardened http.Server, go:embed
+console.go            terminal experience (-console): full weighted + cumulative flow
+grading/              core academic logic (single source of truth)
+  grading.go            CourseInput{Code,CU,Score}, QP=CU×GP, cumulative CGPA,
+                        prior-record validation, carryover policy, class metrics
+  grading_test.go       tests proving weighted + cumulative + validation behaviour
+  report.go             formatted class report + per-course breakdown
 handlers/             HTTP layer
-  server.go             dedicated ServeMux + all API handlers
-  pages.go              landing + dashboard page rendering, static assets
-  payload.go            JSON request/response contracts
-  store.go              mutex-guarded in-memory roster (cap 100)
-templates/            HTML pages
-  landing.html          marketing / overview page
-  app.html              dashboard with batch wizard
-static/               frontend assets
-  css/style.css         unified stylesheet (landing + dashboard)
-  js/app.js             dashboard logic (batch wizard, report, metrics)
-  js/landing.js         landing page interactions
+  server.go             dedicated ServeMux + API handlers (single + batch)
+  pages.go              landing + dashboard rendering, static assets
+  payload.go            JSON contracts (courses[], prior{})
+  store.go              mutex-guarded roster store (cap 100)
+templates/            landing.html, app.html
+static/               css/style.css, js/app.js, js/landing.js
 ```
-
-Templates and static assets are **embedded into the binary** (`go:embed`), so `go build` produces one portable executable.
 
 ## How to run
 
 ```bash
+go test ./...           # run the grading engine tests
 go run .                # web mode → http://localhost:8080
-go run . -addr :3000    # listen on a different port
-go run . -console       # original terminal program (now with batch support)
+go run . -addr :3000    # different port
+go run . -console       # terminal mode (weighted + cumulative too)
 ```
 
 - Landing page: **http://localhost:8080/**
 - Dashboard: **http://localhost:8080/app**
 
-## API endpoints
+## API
 
-| Endpoint          | Method | Purpose                                        |
-|-------------------|--------|------------------------------------------------|
-| `/`               | GET    | Landing page                                   |
-| `/app`            | GET    | Dashboard                                      |
-| `/api/grade`      | POST   | Grade + store **one** student                  |
-| `/api/grade/batch`| POST   | Grade + store **1–100 students** in one call   |
-| `/api/results`    | GET    | Current roster + class metrics + report text   |
-| `/api/reset`      | POST   | Clear the roster                               |
-| `/api/health`     | GET    | Liveness probe (returns Go version)            |
+| Endpoint          | Method | Purpose                                      |
+|-------------------|--------|----------------------------------------------|
+| `/`               | GET    | Landing page                                 |
+| `/app`            | GET    | Dashboard                                    |
+| `/api/grade`      | POST   | Grade + store one student                    |
+| `/api/grade/batch`| POST   | Grade + store 1–100 students in one call     |
+| `/api/results`    | GET    | Current roster + class metrics + report text |
+| `/api/reset`      | POST   | Clear the roster                             |
+| `/api/health`     | GET    | Liveness probe                               |
 
-Examples:
+### Payload shape
 
-```bash
-# single student
-curl -X POST localhost:8080/api/grade \
-  -H 'Content-Type: application/json' \
-  -d '{"name":"Ada Lovelace","matrikNo":"CSC/2026/0142","marks":[85,65,72]}'
-
-# whole class in one call
-curl -X POST localhost:8080/api/grade/batch \
-  -H 'Content-Type: application/json' \
-  -d '{"students":[
-        {"name":"Ada Lovelace","matrikNo":"CSC/001","marks":[85,65]},
-        {"name":"Alan Turing","matrikNo":"CSC/002","marks":[91,78,64]}
-      ]}'
+```json
+{
+  "name": "Ada Lovelace",
+  "matrikNo": "CSC/2026/0142",
+  "courses": [
+    { "code": "CSC301", "creditUnits": 4, "score": 85 },
+    { "code": "MTH102", "creditUnits": 2, "score": 65 }
+  ],
+  "prior": { "previousCreditUnits": 36, "previousQualityPoints": 142 }
+}
 ```
 
-Batch validation is all-or-nothing: if any student entry is invalid, nothing is stored and the error names the offending student number.
+`prior` is optional — omit it (or zero both fields) for a first-semester student. Each response record includes `Courses[]` with per-course `gradePoint` and `qualityPoints`, plus `TotalCU`, `TotalQP`, `SemesterGPA`, cumulative `CGPA` and `EffectiveCGPA`.
 
 ## Security notes
 
-The server deliberately builds a **dedicated mux** — the package-level `http.HandleFunc` global is never used anywhere:
-
-```go
-mux := http.NewServeMux()
-mux.HandleFunc("/api/grade/batch", handleGradeBatch)
-```
-
-Imported packages therefore cannot silently register routes on our server; the routing surface stays small and auditable. Additional hardening:
-
-- Request bodies capped at 1 MiB via `http.MaxBytesReader` (`413` on overflow)
-- `DisallowUnknownFields` so unexpected JSON fields are rejected
-- Explicit method checks with `Allow` headers on every API route
-- Bounded, mutex-guarded in-memory store (max 100 students)
-- Security headers on every response: `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy`, `Permissions-Policy`
-- Server timeouts (`ReadHeaderTimeout`, `ReadTimeout`, `WriteTimeout`, `IdleTimeout`) against slow-loris attacks
-- Frontend HTML-escapes all server-provided strings before rendering (XSS defence in depth)
+- Dedicated `mux := http.NewServeMux()` — the package-level `http.HandleFunc` global is never used anywhere, so imported packages cannot silently register routes.
+- 1 MiB body cap (`http.MaxBytesReader`, `413`), `DisallowUnknownFields`, explicit method checks with `Allow` headers.
+- Bounded, mutex-guarded in-memory store (max 100 students).
+- Security headers on every response; slow-loris server timeouts.
+- Frontend HTML-escapes all server-provided strings (XSS defence in depth).
 
 ## Biggest technical challenge
 
-Getting the GPA semantics right. The naive approach — convert the overall average to one letter and use its point — inflates results whenever scores span multiple bands. The fix was to grade **each course individually** against the standard 100-point breakdown and average the grade points, encoded once in `grading.BandFor()` and reused by the web UI, the batch report and the console mode, so no mode can drift from the others.
+Modelling the academic rules, not just the math: the weighted QP = CU × GP foundation, keeping failed units in the denominator, computing cumulative CGPA from running TQP/TCU totals (never averaging GPAs), and the both-attempts vs replacement carryover policies — all encoded once in `grading/` with unit tests locking the behaviour in, and shared verbatim by the web UI, the batch report and the console mode.
 
 *Program was written by [Okunade Israel Oluwasegun]*

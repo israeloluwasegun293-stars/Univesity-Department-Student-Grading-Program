@@ -3,7 +3,8 @@ package main
 // console.go preserves the ORIGINAL terminal-based grading program, now
 // reachable with:  go run . -console
 // It asks how many students you are calculating for, walks you through
-// every student, and prints the same formatted report the web UI uses.
+// every student's courses (code, credit units, score) plus any prior
+// semester totals, and prints the same formatted report the web UI uses.
 
 import (
 	"bufio"
@@ -36,7 +37,9 @@ func runConsole() {
 		fmt.Printf("INVALID INPUT! Enter a number between 1 and %d.\n", grading.MaxStudents)
 	}
 
-	fmt.Printf("\nThis Project is configured to process data for %d students across up to %d courses.\n\n", rosterSize, grading.MaxCourses)
+	fmt.Printf("\nThis Project is configured to process data for %d students across up to %d courses.\n", rosterSize, grading.MaxCourses)
+	fmt.Println("Every course needs its Credit Units — the CGPA is weighted by them.")
+	fmt.Println()
 
 	classRoster := make([]grading.StudentRecord, 0, rosterSize)
 	metrics := grading.NewClassMetrics()
@@ -67,7 +70,35 @@ func runConsole() {
 			}
 		}
 
-		// Ask how many courses for this student.
+		// Prior semesters (for the cumulative CGPA). Enter 0 for a fresh student.
+		prior := grading.PriorRecord{}
+		for {
+			fmt.Print("  Previous credit units (from earlier semesters, 0 if none): ")
+			if consoleReader.Scan() {
+				n, err := strconv.Atoi(strings.TrimSpace(consoleReader.Text()))
+				if err == nil && n >= 0 {
+					prior.TotalCreditUnits = n
+					break
+				}
+			}
+			fmt.Println("  INVALID INPUT! Enter 0 or a positive whole number.")
+		}
+		if prior.TotalCreditUnits > 0 {
+			for {
+				fmt.Print("  Previous total quality points: ")
+				if consoleReader.Scan() {
+					qp, err := strconv.ParseFloat(strings.TrimSpace(consoleReader.Text()), 64)
+					if err == nil && qp >= 0 && qp <= float64(prior.TotalCreditUnits)*5.0 {
+						prior.TotalQualityPoints = qp
+						break
+					}
+				}
+				fmt.Printf("  INVALID INPUT! Enter a number between 0 and %.2f (5.0 × credit units).\n",
+					float64(prior.TotalCreditUnits)*5.0)
+			}
+		}
+
+		// How many courses for this student.
 		var courseCount int
 		for {
 			fmt.Printf("  How many courses for %s? (1-%d): ", name, grading.MaxCourses)
@@ -81,29 +112,59 @@ func runConsole() {
 			fmt.Printf("  INVALID INPUT! Enter a number between 1 and %d.\n", grading.MaxCourses)
 		}
 
-		marks := make([]float64, courseCount)
+		courses := make([]grading.CourseInput, courseCount)
 		for j := 0; j < courseCount; j++ {
+			var code string
+			var cu int
+			var score float64
+
 			for {
-				fmt.Printf("  Enter score for Course %d (0-100): ", j+1)
+				fmt.Printf("  Course %d code/name: ", j+1)
 				if consoleReader.Scan() {
-					inputStr := strings.TrimSpace(consoleReader.Text())
-					score, err := strconv.ParseFloat(inputStr, 64)
-					if err == nil && score >= 0 && score <= 100 {
-						marks[j] = score
+					code = strings.TrimSpace(consoleReader.Text())
+					if code != "" {
+						break
+					}
+				}
+				fmt.Println("  Error: course code cannot be blank.")
+			}
+
+			for {
+				fmt.Printf("  Credit Units for %s (1-%d): ", code, grading.MaxCreditUnits)
+				if consoleReader.Scan() {
+					n, err := strconv.Atoi(strings.TrimSpace(consoleReader.Text()))
+					if err == nil && n >= grading.MinCreditUnits && n <= grading.MaxCreditUnits {
+						cu = n
+						break
+					}
+				}
+				fmt.Printf("  INVALID INPUT! Enter valid credit units (e.g., %d to %d).\n",
+					grading.MinCreditUnits, grading.MaxCreditUnits)
+			}
+
+			for {
+				fmt.Printf("  Enter score for %s (0-100): ", code)
+				if consoleReader.Scan() {
+					s, err := strconv.ParseFloat(strings.TrimSpace(consoleReader.Text()), 64)
+					if err == nil && s >= 0 && s <= 100 {
+						score = s
 						break
 					}
 				}
 				fmt.Println("  INVALID INPUT! Score must be a valid number between 0 and 100.")
 			}
+
+			courses[j] = grading.CourseInput{Code: code, CreditUnits: cu, Score: score}
 		}
 
-		rec, err := grading.ProcessStudent(name, matric, marks)
+		rec, err := grading.ProcessStudent(name, matric, courses, prior)
 		if err != nil {
 			fmt.Println(err.Error())
 			i-- // retry this student
 			continue
 		}
 
+		fmt.Print(grading.FormatCourseBreakdown(rec))
 		classRoster = append(classRoster, rec)
 		metrics.Add(rec)
 	}

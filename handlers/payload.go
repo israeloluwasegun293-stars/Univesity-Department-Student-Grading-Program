@@ -7,11 +7,14 @@ import (
 	"github.com/israeloluwasegun293-stars/classedge/grading"
 )
 
-// GradeRequest is the JSON body POSTed to /api/grade.
+// GradeRequest is the JSON body POSTed to /api/grade. A proper CGPA
+// calculator collects three fields per course (code, credit units, score)
+// plus the student's prior running totals for the cumulative CGPA.
 type GradeRequest struct {
-	Name     string    `json:"name"`
-	MatrikNo string    `json:"matrikNo"`
-	Marks    []float64 `json:"marks"`
+	Name     string                `json:"name"`
+	MatrikNo string                `json:"matrikNo"`
+	Courses  []grading.CourseInput `json:"courses"`
+	Prior    grading.PriorRecord   `json:"prior"`
 }
 
 // BatchRequest is the JSON body POSTed to /api/grade/batch: one entry per

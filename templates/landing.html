@@ -59,8 +59,8 @@
     <div class="feature-grid">
       <div class="feature">
         <span class="f-icon">🎯</span>
-        <h4>Accurate per-course grading</h4>
-        <p>Every course score is graded on the standard 100-point breakdown, then the grade points are averaged into the CGPA. Scores spanning multiple bands are handled honestly — no inflated averages.</p>
+        <h4>Weighted, credit-unit accurate</h4>
+        <p>Every course is graded on the standard 100-point breakdown, then weighted by its <strong>credit units</strong>: Quality Points = Units × Grade Point, and CGPA = ΣQP ÷ ΣCU. A 5-unit course counts five times as much as a 1-unit elective.</p>
       </div>
       <div class="feature">
         <span class="f-icon">👥</span>
@@ -108,12 +108,14 @@
       </table>
     </div>
     <div class="scale-example">
-      <h4>Worked example — why per-course matters</h4>
-      <p>A student scores <strong class="mono">85</strong> and <strong class="mono">65</strong> in two courses.</p>
+      <h4>Worked example — why credit units matter</h4>
+      <p>A student scores <strong class="mono">85</strong> in a 4-unit course and <strong class="mono">65</strong> in a 2-unit course.</p>
       <ul>
-        <li>85 → <span class="pill pill-A">A</span> (5 points) · 65 → <span class="pill pill-B">B</span> (4 points)</li>
-        <li>CGPA = (5 + 4) ÷ 2 = <strong class="mono grad-text">4.50</strong> ✅</li>
-        <li class="wrong">Grading the 75% average alone would give A → 5.00 — inflated and wrong ❌</li>
+        <li>85 → <span class="pill pill-A">A</span> (5.0 GP) × 4 units = <strong class="mono">20 QP</strong></li>
+        <li>65 → <span class="pill pill-B">B</span> (4.0 GP) × 2 units = <strong class="mono">8 QP</strong></li>
+        <li>CGPA = (20 + 8) ÷ (4 + 2) = <strong class="mono grad-text">4.67</strong> ✅</li>
+        <li class="wrong">A flat average of grade points would say (5+4)÷2 = 4.50 — it ignores that the A came in a course worth double the units ❌</li>
+        <li>Cumulative across semesters: CGPA = Σ(all Quality Points) ÷ Σ(all Credit Units) — never the average of semester GPAs.</li>
       </ul>
     </div>
   </section>
@@ -130,8 +132,8 @@
       </div>
       <div class="step">
         <span class="step-num">2</span>
-        <h4>Enter names &amp; scores</h4>
-        <p>Student name, matric number and up to 5 course scores (0–100) each. Live preview grades as you type.</p>
+        <h4>Enter courses &amp; credit units</h4>
+        <p>Student name, matric number, then each course's code, credit units (1–6) and score (0–100). Carry-over students add previous ΣQP/ΣCU for a true cumulative CGPA. Live weighted preview as you type.</p>
       </div>
       <div class="step">
         <span class="step-num">3</span>

@@ -80,7 +80,7 @@ func handleGrade(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rec, err := grading.ProcessStudent(req.Name, req.MatrikNo, req.Marks)
+	rec, err := grading.ProcessStudent(req.Name, req.MatrikNo, req.Courses, req.Prior)
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, apiError{err.Error()})
 		return
@@ -130,7 +130,7 @@ func handleGradeBatch(w http.ResponseWriter, r *http.Request) {
 
 	records := make([]grading.StudentRecord, 0, len(req.Students))
 	for i, s := range req.Students {
-		rec, err := grading.ProcessStudent(s.Name, s.MatrikNo, s.Marks)
+		rec, err := grading.ProcessStudent(s.Name, s.MatrikNo, s.Courses, s.Prior)
 		if err != nil {
 			writeJSON(w, http.StatusBadRequest, apiError{fmt.Sprintf("Student #%d: %s", i+1, err.Error())})
 			return

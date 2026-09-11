@@ -2,20 +2,35 @@
 // single source of truth used by the web handlers, the batch report and
 // the original console mode.
 //
-// Grading follows the standard 100-point breakdown on a 5.0 scale:
+// ── The academic model ────────────────────────────────────────────────
+// A good CGPA calculator cannot just average raw percentages: every
+// course carries Credit Units (CU) that weight its influence, and a
+// cumulative CGPA must be derived from running totals — never by
+// averaging semester GPAs.
 //
-//	70–100%  A  Excellent
-//	60–69%   B  Very Good
-//	50–59%   C  Credit
-//	45–49%   D  Pass
-//	40–44%   E  Low Pass
-//	0–39%    F  Fail
+// For every course the calculator accepts: a course code/name, the
+// credit units, and the raw score (0–100). It then computes:
 //
-// Accuracy note: every course score is graded INDIVIDUALLY and the
-// student's GPA is the mean of the per-course grade points (standard CGPA
-// practice). Grading one letter from the overall average and using its
-// point value inflates results whenever scores span multiple bands —
-// e.g. 85 + 65 must average to (5+4)/2 = 4.50, not 5.00.
+//	GradePoint  — from the score via the standard 5.0-scale mapping
+//	QualityPts  = CreditUnits × GradePoint          (per course)
+//	SemesterGPA = Σ QualityPoints / Σ CreditUnits   (per semester)
+//	Cumulative  = (priorTQP + Σ QualityPoints) / (priorTCU + Σ CreditUnits)
+//
+// Key academic rules encoded here:
+//   - Weighted: an A in a 5-unit course moves the CGPA five times more
+//     than an A in a 1-unit course.
+//   - Fails still count: an F contributes 0 quality points but its
+//     credit units still enter the denominator — this is what drags a
+//     GPA down.
+//   - Cumulative, not averaged: CGPA is always TQP/TCU over ALL attempts,
+//     never (GPA1 + GPA2) / 2.
+//   - Repeat/carryover policy: both attempts stay on the record by
+//     default (the common Nigerian public-university rule). Passing a
+//     retake therefore does not erase the earlier F; callers may pass
+//     prior totals that already include the failed attempt and simply
+//     append the new passing attempt. A best-so-far "effective CGPA"
+//     (as-if the best attempt per course replaced the F) is also
+//     provided for institutions with a replacement policy.
 package grading
 
 import (
@@ -27,34 +42,16 @@ import (
 const (
 	// coursework cap: the system processes at most 100 students
 	MaxStudents = 100
-	// a student takes at most 5 courses
+	// a student takes at most 5 courses per submission
 	MaxCourses = 5
+	// credit units bounds per course (typical Nigerian university range)
+	MinCreditUnits = 1
+	MaxCreditUnits = 6
 )
 
 // GradePoint maps each letter grade to its grade point on the 5.0 scale.
 var GradePoint = map[string]float64{
 	"A": 5, "B": 4, "C": 3, "D": 2, "E": 1, "F": 0,
-}
-
-// CourseGrade is the individual verdict for one course score.
-type CourseGrade struct {
-	Course string  `json:"course"` // "C1", "C2", ...
-	Score  float64 `json:"score"`
-	Letter string  `json:"letter"`
-	Point  float64 `json:"point"`
-}
-
-// StudentRecord carries everything computed for one student.
-type StudentRecord struct {
-	Name         string        `json:"Name"`
-	MatrikNo     string        `json:"MatrikNo"`
-	Marks        []float64     `json:"Marks"`
-	CourseGrades []CourseGrade `json:"CourseGrades"`
-	TotalMarks   float64       `json:"TotalMarks"`
-	AverageMark  float64       `json:"AverageMark"`
-	GradeLeter   string        `json:"GradeLeter"` // overall grade, from the average %
-	GradeLabel   string        `json:"GradeLabel"` // Excellent / Very Good / Credit / Pass / Low Pass / Fail
-	GPA          float64       `json:"GPA"`        // mean of the per-course grade points
 }
 
 // BandFor maps a percentage score to the standard 100-point breakdown and
@@ -76,15 +73,94 @@ func BandFor(score float64) (letter string, point float64, label string) {
 	}
 }
 
+// CourseInput is the raw per-course data a user supplies. A calculator
+// must collect all three fields — score alone is not enough for a
+// weighted CGPA.
+type CourseInput struct {
+	Code        string  `json:"code"`        // course code or name, e.g. "CSC301"
+	CreditUnits int     `json:"creditUnits"` // weight of the course, 1–6
+	Score       float64 `json:"score"`       // raw percentage, 0–100
+}
+
+// CourseGrade is the computed verdict for one course.
+type CourseGrade struct {
+	Code        string  `json:"Code"`
+	CreditUnits int     `json:"CreditUnits"`
+	Score       float64 `json:"Score"`
+	Letter      string  `json:"Letter"`
+	GradePoint  float64 `json:"GradePoint"`
+	QualityPts  float64 `json:"QualityPts"` // CreditUnits × GradePoint
+}
+
+// PriorRecord carries the running totals from earlier semesters so a
+// cumulative CGPA can be computed. Both fields must be supplied together;
+// leaving both zero treats this submission as the student's first
+// semester.
+type PriorRecord struct {
+	TotalCreditUnits   int     `json:"previousCreditUnits"`   // Σ CU from prior semesters
+	TotalQualityPoints float64 `json:"previousQualityPoints"` // Σ QP from prior semesters
+}
+
 // inputError is a lightweight error type for user-input validation
 // failures; its message is safe to show to the browser.
 type inputError struct{ msg string }
 
 func (e inputError) Error() string { return e.msg }
 
+// StudentRecord carries everything computed for one student.
+type StudentRecord struct {
+	Name          string        `json:"Name"`
+	MatrikNo      string        `json:"MatrikNo"`
+	Courses       []CourseGrade `json:"Courses"`
+	TotalMarks    float64       `json:"TotalMarks"`    // Σ raw scores (informational)
+	AverageMark   float64       `json:"AverageMark"`   // mean raw score (informational)
+	TotalCU       int           `json:"TotalCU"`       // Σ credit units this submission
+	TotalQP       float64       `json:"TotalQP"`       // Σ quality points this submission
+	SemesterGPA   float64       `json:"SemesterGPA"`   // ΣQP/ΣCU for this submission
+	GradeLeter    string        `json:"GradeLeter"`    // overall letter, from the average %
+	GradeLabel    string        `json:"GradeLabel"`    // Excellent / Very Good / ...
+	CGPA          float64       `json:"CGPA"`          // cumulative, incl. prior record
+	EffectiveCGPA float64       `json:"EffectiveCGPA"` // best-attempt variant (replacement policy)
+	Attempts      int           `json:"Attempts"`      // 1 = fresh, 2 = carryover student
+}
+
+// validateCU checks a credit-unit value against the allowed range.
+func validateCU(cu int) error {
+	if cu < MinCreditUnits || cu > MaxCreditUnits {
+		return inputError{fmt.Sprintf(
+			"INVALID INPUT! Credit units must be a whole number between %d and %d.",
+			MinCreditUnits, MaxCreditUnits)}
+	}
+	return nil
+}
+
+// validatePriorRecord checks the running totals supplied for cumulative
+// computation. Zero prior units means "first semester" and is fine; any
+// prior units must come with non-negative quality points and a plausible
+// per-unit point average (≤ 5.0).
+func validatePriorRecord(p PriorRecord) error {
+	if p.TotalCreditUnits < 0 {
+		return inputError{"INVALID INPUT! Previous credit units cannot be negative."}
+	}
+	if p.TotalQualityPoints < 0 {
+		return inputError{"INVALID INPUT! Previous quality points cannot be negative."}
+	}
+	if p.TotalCreditUnits == 0 && p.TotalQualityPoints > 0 {
+		return inputError{"INVALID INPUT! Previous quality points supplied without credit units."}
+	}
+	if p.TotalCreditUnits > 0 {
+		// ΣQP/ΣCU can never exceed 5.0 on this scale.
+		if p.TotalQualityPoints > float64(p.TotalCreditUnits)*5.0 {
+			return inputError{"INVALID INPUT! Previous quality points exceed 5.0 × credit units."}
+		}
+	}
+	return nil
+}
+
 // ProcessStudent validates the raw input and computes the complete
-// academic record for one student.
-func ProcessStudent(name, matric string, marks []float64) (StudentRecord, error) {
+// academic record for one student, including the cumulative CGPA when a
+// prior record is supplied.
+func ProcessStudent(name, matric string, courses []CourseInput, prior PriorRecord) (StudentRecord, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return StudentRecord{}, inputError{"Error: Please provide an input, student name cannot be blank."}
@@ -101,34 +177,88 @@ func ProcessStudent(name, matric string, marks []float64) (StudentRecord, error)
 		return StudentRecord{}, inputError{"Error: Matric number is too long."}
 	}
 
-	if len(marks) == 0 || len(marks) > MaxCourses {
+	if len(courses) == 0 || len(courses) > MaxCourses {
 		return StudentRecord{}, inputError{"Error: A student must have between 1 and 5 courses."}
 	}
 
-	rec := StudentRecord{Name: name, MatrikNo: matric, Marks: make([]float64, len(marks))}
-
-	var sum, points float64
-	for j, score := range marks {
-		// INVALID INPUT! Score must be a valid number between 0 and 100.
-		if score < 0 || score > 100 {
-			return StudentRecord{}, inputError{"INVALID INPUT! Score must be a valid number between 0 and 100."}
-		}
-		letter, point, _ := BandFor(score)
-		rec.Marks[j] = score
-		rec.CourseGrades = append(rec.CourseGrades, CourseGrade{
-			Course: fmt.Sprintf("C%d", j+1),
-			Score:  score,
-			Letter: letter,
-			Point:  point,
-		})
-		sum += score
-		points += point
+	if err := validatePriorRecord(prior); err != nil {
+		return StudentRecord{}, err
 	}
 
-	rec.TotalMarks = round2(sum)
-	rec.AverageMark = round2(sum / float64(len(marks)))
-	rec.GPA = round2(points / float64(len(marks)))
+	rec := StudentRecord{
+		Name:     name,
+		MatrikNo: matric,
+		Courses:  make([]CourseGrade, 0, len(courses)),
+		Attempts: 1,
+	}
+	if prior.TotalCreditUnits > 0 {
+		rec.Attempts = 2 // carryover student presenting prior semesters
+	}
+
+	var sumQP, sumScores float64
+	sumCU := 0
+	for j, in := range courses {
+		code := strings.TrimSpace(in.Code)
+		if code == "" {
+			return StudentRecord{}, inputError{fmt.Sprintf(
+				"Course %d: course code/name cannot be blank.", j+1)}
+		}
+		if len(code) > 20 {
+			return StudentRecord{}, inputError{fmt.Sprintf(
+				"Course %d: course code is too long.", j+1)}
+		}
+		if err := validateCU(in.CreditUnits); err != nil {
+			return StudentRecord{}, inputError{fmt.Sprintf("Course %d (%s): %s", j+1, code, err.Error())}
+		}
+		// INVALID INPUT! Score must be a valid number between 0 and 100.
+		if in.Score < 0 || in.Score > 100 {
+			return StudentRecord{}, inputError{fmt.Sprintf(
+				"Course %d (%s): INVALID INPUT! Score must be a valid number between 0 and 100.", j+1, code)}
+		}
+
+		letter, point, _ := BandFor(in.Score)
+		qp := float64(in.CreditUnits) * point
+
+		rec.Courses = append(rec.Courses, CourseGrade{
+			Code:        code,
+			CreditUnits: in.CreditUnits,
+			Score:       in.Score,
+			Letter:      letter,
+			GradePoint:  point,
+			QualityPts:  qp,
+		})
+		sumQP += qp
+		sumCU += in.CreditUnits
+		sumScores += in.Score
+	}
+
+	rec.TotalCU = sumCU
+	rec.TotalQP = round2(sumQP)
+	rec.SemesterGPA = round2(sumQP / float64(sumCU))
+	rec.TotalMarks = round2(sumScores)
+	rec.AverageMark = round2(sumScores / float64(len(courses)))
 	rec.GradeLeter, _, rec.GradeLabel = BandFor(rec.AverageMark)
+
+	// Cumulative CGPA: ΣTQP / ΣTCU across ALL semesters — never the
+	// average of semester GPAs. Fails (F = 0 QP) still contribute their
+	// credit units to the denominator.
+	cuAll := prior.TotalCreditUnits + sumCU
+	qpAll := prior.TotalQualityPoints + sumQP
+	if cuAll > 0 {
+		rec.CGPA = round2(qpAll / float64(cuAll))
+	}
+
+	// Effective CGPA under a replacement policy: the stronger of the two
+	// totals (used when an institution replaces a failed attempt with a
+	// passing retake). With no prior record the two agree.
+	if prior.TotalCreditUnits > 0 {
+		bestQP := math.Max(prior.TotalQualityPoints, sumQP)
+		bestCU := math.Max(float64(prior.TotalCreditUnits), float64(sumCU))
+		rec.EffectiveCGPA = round2(bestQP / bestCU)
+	} else {
+		rec.EffectiveCGPA = rec.CGPA
+	}
+
 	return rec, nil
 }
 
@@ -164,14 +294,14 @@ func (m *ClassMetrics) Add(s StudentRecord) {
 	if s.AverageMark < m.LowestAvg {
 		m.LowestAvg = s.AverageMark
 	}
-	if s.GPA > m.HighestGPA {
-		m.HighestGPA = s.GPA
+	if s.CGPA > m.HighestGPA {
+		m.HighestGPA = s.CGPA
 	}
-	if s.GPA < m.LowestGPA {
-		m.LowestGPA = s.GPA
+	if s.CGPA < m.LowestGPA {
+		m.LowestGPA = s.CGPA
 	}
 	m.GradeCounts[s.GradeLeter]++
-	m.gpaSum += s.GPA
+	m.gpaSum += s.CGPA
 }
 
 // Finalize computes derived values; call it once after the last Add.
