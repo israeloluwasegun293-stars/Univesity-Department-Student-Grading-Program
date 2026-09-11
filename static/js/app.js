@@ -378,7 +378,10 @@ function bindReportActions() {
   $("print-report").addEventListener("click", () => window.print());
 }
 
-function bindBackButton() {
+function bindBatchControls() {
+  // "Set up batch →" — builds the per-student forms for the chosen count.
+  $("start-batch").addEventListener("click", startBatch);
+  // "← Change count" — back to the batch-size chooser.
   $("back-btn").addEventListener("click", () => {
     $("grade-form").hidden = true;
     $("batch-box").hidden = false;
@@ -399,7 +402,7 @@ function bindBackButton() {
 })();
 
 bindCountButtons();
+bindBatchControls();
 bindSubmit();
 bindReset();
 bindReportActions();
-bindBackButton();
