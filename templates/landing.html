@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ClassEdge — University CGPA Grading System</title>
+  <meta name="description" content="ClassEdge is a university CGPA grading system: grade one student or a whole class on the standard 5.0 scale, with instant reports, class metrics and a leaderboard." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="static/css/style.css" />
+</head>
+<body class="landing-body">
+  <div class="bg-orb orb-a" aria-hidden="true"></div>
+  <div class="bg-orb orb-b" aria-hidden="true"></div>
+
+  <!-- ============ NAVBAR ============ -->
+  <header class="site-header">
+    <div class="brand">
+      <span class="brand-mark">◆</span>
+      <div>
+        <h1>Class<span>Edge</span></h1>
+        <p class="tagline">CGPA Command Center</p>
+      </div>
+    </div>
+    <nav class="nav-links">
+      <a href="#what">What it does</a>
+      <a href="#scale">Grading scale</a>
+      <a href="#how">How it works</a>
+      <a href="/app" class="btn btn-small btn-primary">Launch Dashboard ⚡</a>
+    </nav>
+  </header>
+
+  <!-- ============ HERO ============ -->
+  <section class="hero">
+    <p class="hero-kicker">Built with Go · Zero dependencies · 5.0 Scale</p>
+    <h2>Grade a student.<br /><span class="grad-text">Or the entire class.</span></h2>
+    <p class="hero-sub">
+      ClassEdge turns raw course scores into a clean, standard 100-point CGPA report —
+      with per-course grade points, class metrics, a leaderboard and results so nicely
+      formatted you could pin them on the department notice board.
+    </p>
+    <div class="hero-cta">
+      <a href="/app" class="btn btn-primary">Start Grading — it's free ⚡</a>
+      <a href="#how" class="btn btn-ghost">See how it works</a>
+    </div>
+    <div class="hero-strip">
+      <div class="strip-item"><strong>5.0</strong><span>max GPA scale</span></div>
+      <div class="strip-item"><strong>100</strong><span>students per batch</span></div>
+      <div class="strip-item"><strong>5</strong><span>courses per student</span></div>
+      <div class="strip-item"><strong>&lt;1s</strong><span>class report time</span></div>
+    </div>
+  </section>
+
+  <!-- ============ WHAT ============ -->
+  <section class="landing-section" id="what">
+    <h3 class="section-title">What is ClassEdge <span class="grad-text">for?</span></h3>
+    <p class="section-sub">One tool for the whole results season — from single spot-checks to full department batches.</p>
+    <div class="feature-grid">
+      <div class="feature">
+        <span class="f-icon">🎯</span>
+        <h4>Accurate per-course grading</h4>
+        <p>Every course score is graded on the standard 100-point breakdown, then the grade points are averaged into the CGPA. Scores spanning multiple bands are handled honestly — no inflated averages.</p>
+      </div>
+      <div class="feature">
+        <span class="f-icon">👥</span>
+        <h4>One student or one hundred</h4>
+        <p>Choose exactly how many students you're calculating for. The batch wizard walks you through the whole class and produces one formatted report for everyone.</p>
+      </div>
+      <div class="feature">
+        <span class="f-icon">📊</span>
+        <h4>Class metrics &amp; distribution</h4>
+        <p>Highest and lowest averages, class mean GPA and a live A–F distribution chart — the department summary you used to build by hand in a spreadsheet.</p>
+      </div>
+      <div class="feature">
+        <span class="f-icon">🏆</span>
+        <h4>Leaderboard &amp; reveal moments</h4>
+        <p>Results land in a sorted leaderboard, and every A-grade triggers a full-screen confetti reveal. Make results day fun again.</p>
+      </div>
+      <div class="feature">
+        <span class="f-icon">🔒</span>
+        <h4>Hardened by design</h4>
+        <p>Explicit ServeMux routing, body-size limits, method checks, security headers and full HTML escaping — a safe little server you can actually show your lecturer.</p>
+      </div>
+      <div class="feature">
+        <span class="f-icon">🖨️</span>
+        <h4>Formatted, printable reports</h4>
+        <p>The batch report renders in a clean monospace table you can copy, save or print — mirroring the classic department results sheet.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SCALE ============ -->
+  <section class="landing-section" id="scale">
+    <h3 class="section-title">The standard <span class="grad-text">100-point breakdown</span></h3>
+    <p class="section-sub">Percentage score → letter grade → grade point. Averaged per course, exactly as universities do it.</p>
+    <div class="scale-table-wrap">
+      <table class="scale-table">
+        <thead><tr><th>Score range</th><th>Letter</th><th>Grade point</th><th>Remark</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">70 – 100%</td><td><span class="pill pill-A">A</span></td><td class="mono">5.0</td><td>Excellent</td></tr>
+          <tr><td class="mono">60 – 69%</td><td><span class="pill pill-B">B</span></td><td class="mono">4.0</td><td>Very Good</td></tr>
+          <tr><td class="mono">50 – 59%</td><td><span class="pill pill-C">C</span></td><td class="mono">3.0</td><td>Credit</td></tr>
+          <tr><td class="mono">45 – 49%</td><td><span class="pill pill-D">D</span></td><td class="mono">2.0</td><td>Pass</td></tr>
+          <tr><td class="mono">40 – 44%</td><td><span class="pill pill-E">E</span></td><td class="mono">1.0</td><td>Low Pass</td></tr>
+          <tr><td class="mono">0 – 39%</td><td><span class="pill pill-F">F</span></td><td class="mono">0.0</td><td>Fail</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="scale-example">
+      <h4>Worked example — why per-course matters</h4>
+      <p>A student scores <strong class="mono">85</strong> and <strong class="mono">65</strong> in two courses.</p>
+      <ul>
+        <li>85 → <span class="pill pill-A">A</span> (5 points) · 65 → <span class="pill pill-B">B</span> (4 points)</li>
+        <li>CGPA = (5 + 4) ÷ 2 = <strong class="mono grad-text">4.50</strong> ✅</li>
+        <li class="wrong">Grading the 75% average alone would give A → 5.00 — inflated and wrong ❌</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ============ HOW ============ -->
+  <section class="landing-section" id="how">
+    <h3 class="section-title">How it <span class="grad-text">works</span></h3>
+    <p class="section-sub">Three steps, about a minute for a full class.</p>
+    <div class="steps">
+      <div class="step">
+        <span class="step-num">1</span>
+        <h4>Choose your batch size</h4>
+        <p>Pick 1 for a quick check, or up to 100 for a full department submission.</p>
+      </div>
+      <div class="step">
+        <span class="step-num">2</span>
+        <h4>Enter names &amp; scores</h4>
+        <p>Student name, matric number and up to 5 course scores (0–100) each. Live preview grades as you type.</p>
+      </div>
+      <div class="step">
+        <span class="step-num">3</span>
+        <h4>Reveal the report</h4>
+        <p>Every student graded instantly, plus the formatted class report, metrics and leaderboard.</p>
+      </div>
+    </div>
+    <div class="hero-cta center">
+      <a href="/app" class="btn btn-primary">Launch the Dashboard ⚡</a>
+    </div>
+  </section>
+
+  <footer class="site-footer">
+    <p>ClassEdge · Built with <strong>Go</strong> + vanilla JS · <code>http.NewServeMux()</code> routing · <a href="https://github.com/israeloluwasegun293-stars">Okunade Israel Oluwasegun</a></p>
+  </footer>
+
+  <script src="static/js/landing.js"></script>
+</body>
+</html>
