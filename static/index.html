@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ClassEdge — CGPA Command Center</title>
+  <meta name="description" content="Grade students, reveal GPAs and watch the class leaderboard come alive — powered by Go." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <canvas id="fx-canvas" aria-hidden="true"></canvas>
+  <div class="bg-orb orb-a" aria-hidden="true"></div>
+  <div class="bg-orb orb-b" aria-hidden="true"></div>
+
+  <!-- ============ HEADER ============ -->
+  <header class="site-header">
+    <div class="brand">
+      <span class="brand-mark">◆</span>
+      <div>
+        <h1>Class<span>Edge</span></h1>
+        <p class="tagline">CGPA Command Center</p>
+      </div>
+    </div>
+    <div class="server-chip" id="server-chip" title="Live status of your Go backend">
+      <span class="dot"></span> <span id="server-status">connecting…</span>
+      <span class="goversion" id="go-version"></span>
+    </div>
+  </header>
+
+  <main class="layout">
+    <!-- ============ ENTRY FORM ============ -->
+    <section class="card form-card" aria-labelledby="form-title">
+      <h2 id="form-title">Grade a Student</h2>
+      <p class="muted">Enter scores 0–100. The 5.0 scale engine does the rest.</p>
+
+      <form id="grade-form" autocomplete="off">
+        <div class="field">
+          <label for="student-name">Student full name</label>
+          <input id="student-name" name="name" type="text" maxlength="120" placeholder="e.g. Ada Lovelace" required />
+        </div>
+
+        <div class="field">
+          <label for="student-matric">Matriculation number</label>
+          <input id="student-matric" name="matrikNo" type="text" maxlength="40" placeholder="e.g. CSC/2026/0142" required />
+        </div>
+
+        <div class="field">
+          <label>Course scores <span class="muted small">(leave later ones blank if fewer courses)</span></label>
+          <div class="score-grid" id="score-grid">
+            <div class="score-cell">
+              <span class="score-tag">C1</span>
+              <input type="number" class="score-input" min="0" max="100" step="0.5" placeholder="—" aria-label="Course 1 score" />
+            </div>
+            <div class="score-cell">
+              <span class="score-tag">C2</span>
+              <input type="number" class="score-input" min="0" max="100" step="0.5" placeholder="—" aria-label="Course 2 score" />
+            </div>
+            <div class="score-cell">
+              <span class="score-tag">C3</span>
+              <input type="number" class="score-input" min="0" max="100" step="0.5" placeholder="—" aria-label="Course 3 score" />
+            </div>
+            <div class="score-cell">
+              <span class="score-tag">C4</span>
+              <input type="number" class="score-input" min="0" max="100" step="0.5" placeholder="—" aria-label="Course 4 score" />
+            </div>
+            <div class="score-cell">
+              <span class="score-tag">C5</span>
+              <input type="number" class="score-input" min="0" max="100" step="0.5" placeholder="—" aria-label="Course 5 score" />
+            </div>
+          </div>
+        </div>
+
+        <!-- live client-side preview of what the server will compute -->
+        <div class="preview-strip" id="preview-strip" aria-live="polite">
+          <span class="muted">Projected grade:</span>
+          <span class="preview-grade" id="preview-grade">—</span>
+          <span class="muted" id="preview-detail">enter scores to preview</span>
+        </div>
+
+        <button type="submit" class="btn btn-primary" id="submit-btn">
+          <span class="btn-face">Reveal Result ⚡</span>
+        </button>
+        <p class="form-error" id="form-error" role="alert" hidden></p>
+      </form>
+    </section>
+
+    <!-- ============ RESULT REVEAL ============ -->
+    <section class="card reveal-card" aria-labelledby="reveal-title" aria-live="polite">
+      <h2 id="reveal-title">Result Reveal</h2>
+
+      <div class="reveal-empty" id="reveal-empty">
+        <div class="empty-ring">
+          <span>?</span>
+        </div>
+        <p>Submit a student to trigger the <strong>reveal</strong>.</p>
+      </div>
+
+      <div class="reveal-body" id="reveal-body" hidden>
+        <div class="reveal-top">
+          <div class="grade-medal" id="grade-medal">
+            <span id="reveal-grade">A</span>
+          </div>
+          <div class="reveal-meta">
+            <h3 id="reveal-name">Student Name</h3>
+            <p class="muted mono" id="reveal-matric">MATRIC/NO</p>
+            <p class="verdict" id="reveal-verdict">Outstanding — first class territory!</p>
+          </div>
+          <div class="gpa-ring-wrap">
+            <svg class="gpa-ring" viewBox="0 0 120 120" role="img" aria-label="GPA gauge">
+              <circle class="ring-bg" cx="60" cy="60" r="52" />
+              <circle class="ring-fg" id="ring-fg" cx="60" cy="60" r="52" />
+            </svg>
+            <div class="ring-label">
+              <strong id="reveal-gpa">5.00</strong>
+              <span>GPA / 5.0</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="reveal-stats">
+          <div class="rstat"><span class="rstat-label">Average</span><strong id="reveal-avg">0.00</strong></div>
+          <div class="rstat"><span class="rstat-label">Total</span><strong id="reveal-total">0.00</strong></div>
+          <div class="rstat"><span class="rstat-label">Courses</span><strong id="reveal-courses">0</strong></div>
+        </div>
+
+        <div class="course-chips" id="course-chips"></div>
+      </div>
+    </section>
+
+    <!-- ============ CLASS METRICS ============ -->
+    <section class="card metrics-card" aria-labelledby="metrics-title">
+      <div class="card-head">
+        <h2 id="metrics-title">Class Metrics</h2>
+        <button class="btn btn-ghost" id="reset-btn" type="button">Clear roster</button>
+      </div>
+
+      <div class="stats-row">
+        <div class="stat">
+          <span class="stat-num" id="stat-count">0</span>
+          <span class="stat-label">Students graded</span>
+        </div>
+        <div class="stat">
+          <span class="stat-num gold" id="stat-avg-gpa">0.00</span>
+          <span class="stat-label">Class avg GPA</span>
+        </div>
+        <div class="stat">
+          <span class="stat-num green" id="stat-high-avg">0.00</span>
+          <span class="stat-label">Highest average</span>
+        </div>
+        <div class="stat">
+          <span class="stat-num red" id="stat-low-avg">0.00</span>
+          <span class="stat-label">Lowest average</span>
+        </div>
+      </div>
+
+      <div class="dist-wrap">
+        <h3 class="dist-title">Grade distribution</h3>
+        <div class="dist-bars" id="dist-bars">
+          <!-- bars injected by app.js for A–F -->
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ LEADERBOARD ============ -->
+    <section class="card table-card" aria-labelledby="table-title">
+      <div class="card-head">
+        <h2 id="table-title">Leaderboard</h2>
+        <span class="muted small" id="roster-cap">cap 100 · newest first</span>
+      </div>
+      <div class="table-scroll">
+        <table id="roster-table">
+          <thead>
+            <tr>
+              <th>#</th><th>Name</th><th>Matric no</th><th>Total</th><th>Avg</th><th>Grade</th><th>GPA</th>
+            </tr>
+          </thead>
+          <tbody id="roster-body">
+            <tr class="empty-row"><td colspan="7">No students yet — be the first to reveal a result.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>Built with <strong>Go</strong> + vanilla JS · dedicated <code>http.NewServeMux()</code> routing · grading scale A≥70 · B≥60 · C≥50 · D≥45 · E≥40 · F&lt;40</p>
+  </footer>
+
+  <div class="toast-zone" id="toast-zone" aria-live="assertive"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
