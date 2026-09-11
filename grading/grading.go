@@ -93,12 +93,17 @@ type CourseGrade struct {
 }
 
 // PriorRecord carries the running totals from earlier semesters so a
-// cumulative CGPA can be computed. Both fields must be supplied together;
-// leaving both zero treats this submission as the student's first
-// semester.
+// cumulative CGPA can be computed. CGPA is a ratio (TQP/TCU), so merging
+// a new semester requires BOTH the numerator and the denominator — a
+// previous CGPA alone cannot be combined. Callers may supply either the
+// exact totals (TotalQualityPoints + TotalCreditUnits, preferred) or, as
+// a convenience, the previous CGPA together with TotalCreditUnits, from
+// which TQP is reconstructed as CGPA × TCU. Leaving everything zero
+// treats this submission as the student's first semester.
 type PriorRecord struct {
 	TotalCreditUnits   int     `json:"previousCreditUnits"`   // Σ CU from prior semesters
 	TotalQualityPoints float64 `json:"previousQualityPoints"` // Σ QP from prior semesters
+	PreviousCGPA       float64 `json:"previousCGPA"`          // optional convenience input
 }
 
 // inputError is a lightweight error type for user-input validation
@@ -134,27 +139,42 @@ func validateCU(cu int) error {
 	return nil
 }
 
-// validatePriorRecord checks the running totals supplied for cumulative
-// computation. Zero prior units means "first semester" and is fine; any
-// prior units must come with non-negative quality points and a plausible
-// per-unit point average (≤ 5.0).
-func validatePriorRecord(p PriorRecord) error {
+// normalizePrior validates the prior record and resolves the CGPA
+// convenience input into exact quality points. It must be called before
+// the cumulative computation.
+func normalizePrior(p PriorRecord) (PriorRecord, error) {
 	if p.TotalCreditUnits < 0 {
-		return inputError{"INVALID INPUT! Previous credit units cannot be negative."}
+		return p, inputError{"INVALID INPUT! Previous credit units cannot be negative."}
 	}
 	if p.TotalQualityPoints < 0 {
-		return inputError{"INVALID INPUT! Previous quality points cannot be negative."}
+		return p, inputError{"INVALID INPUT! Previous quality points cannot be negative."}
+	}
+	if p.PreviousCGPA < 0 {
+		return p, inputError{"INVALID INPUT! Previous CGPA cannot be negative."}
+	}
+	if p.PreviousCGPA > 5.0 {
+		return p, inputError{"INVALID INPUT! Previous CGPA cannot exceed 5.0."}
+	}
+	if p.PreviousCGPA > 0 {
+		if p.TotalQualityPoints > 0 {
+			return p, inputError{"INVALID INPUT! Provide either previous quality points or previous CGPA, not both."}
+		}
+		if p.TotalCreditUnits == 0 {
+			return p, inputError{"INVALID INPUT! Previous CGPA requires previous credit units to reconstruct quality points."}
+		}
+		// Reconstruct the exact numerator: TQP = CGPA × TCU.
+		p.TotalQualityPoints = round2(p.PreviousCGPA * float64(p.TotalCreditUnits))
 	}
 	if p.TotalCreditUnits == 0 && p.TotalQualityPoints > 0 {
-		return inputError{"INVALID INPUT! Previous quality points supplied without credit units."}
+		return p, inputError{"INVALID INPUT! Previous quality points supplied without credit units."}
 	}
 	if p.TotalCreditUnits > 0 {
 		// ΣQP/ΣCU can never exceed 5.0 on this scale.
 		if p.TotalQualityPoints > float64(p.TotalCreditUnits)*5.0 {
-			return inputError{"INVALID INPUT! Previous quality points exceed 5.0 × credit units."}
+			return p, inputError{"INVALID INPUT! Previous quality points exceed 5.0 × credit units."}
 		}
 	}
-	return nil
+	return p, nil
 }
 
 // ProcessStudent validates the raw input and computes the complete
@@ -181,7 +201,8 @@ func ProcessStudent(name, matric string, courses []CourseInput, prior PriorRecor
 		return StudentRecord{}, inputError{"Error: A student must have between 1 and 5 courses."}
 	}
 
-	if err := validatePriorRecord(prior); err != nil {
+	prior, err := normalizePrior(prior)
+	if err != nil {
 		return StudentRecord{}, err
 	}
 
