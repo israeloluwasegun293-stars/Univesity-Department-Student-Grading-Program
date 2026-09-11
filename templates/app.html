@@ -33,7 +33,7 @@
     <!-- ============ STEP 1: BATCH SIZE ============ -->
     <section class="card form-card" aria-labelledby="form-title">
       <h2 id="form-title">Grade Students</h2>
-      <p class="muted">Standard 100-point breakdown on the 5.0 scale.</p>
+      <p class="muted">Weighted CGPA: every course needs its <strong>credit units</strong> (1–6). Quality Points = Units × Grade Point; CGPA = ΣQP ÷ ΣCU.</p>
 
       <!-- Batch size chooser -->
       <div class="batch-box" id="batch-box">
@@ -95,8 +95,8 @@
         </div>
 
         <div class="reveal-stats">
-          <div class="rstat"><span class="rstat-label">Average</span><strong id="reveal-avg">0.00</strong></div>
-          <div class="rstat"><span class="rstat-label">Total</span><strong id="reveal-total">0.00</strong></div>
+          <div class="rstat"><span class="rstat-label">Avg %</span><strong id="reveal-avg">0.00</strong></div>
+          <div class="rstat"><span class="rstat-label">QP / CU</span><strong id="reveal-total">0.00</strong></div>
           <div class="rstat"><span class="rstat-label">Courses</span><strong id="reveal-courses">0</strong></div>
         </div>
 
@@ -145,7 +145,7 @@
       <div class="table-scroll">
         <table id="roster-table">
           <thead>
-            <tr><th>#</th><th>Name</th><th>Matric no</th><th>Total</th><th>Avg</th><th>Grade</th><th>CGPA</th></tr>
+            <tr><th>#</th><th>Name</th><th>Matric no</th><th>TCU</th><th>Avg %</th><th>Grade</th><th>CGPA</th></tr>
           </thead>
           <tbody id="roster-body"></tbody>
         </table>
@@ -154,7 +154,7 @@
   </main>
 
   <footer class="site-footer">
-    <p>Built with <strong>Go</strong> + vanilla JS · dedicated <code>http.NewServeMux()</code> routing · A≥70 · B≥60 · C≥50 · D≥45 · E≥40 · F&lt;40</p>
+    <p>Built with <strong>Go</strong> + vanilla JS · dedicated <code>http.NewServeMux()</code> routing · QP = CU × GP · CGPA = ΣQP/ΣCU · A≥70 · B≥60 · C≥50 · D≥45 · E≥40 · F&lt;40</p>
   </footer>
 
   <div class="toast-zone" id="toast-zone" aria-live="assertive"></div>

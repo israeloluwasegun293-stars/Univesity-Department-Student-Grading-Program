@@ -1,8 +1,10 @@
 /* =====================================================================
    ClassEdge — dashboard logic.
-   Batch wizard: pick how many students → per-student forms with live
-   per-course grade chips → submit to /api/grade/batch → formatted report.
-   Talks to the Go backend through the dedicated mux's /api/* routes.
+   Batch wizard: pick how many students → per-student forms with
+   per-course rows (code + credit units + score) and optional prior
+   semester totals → submit to /api/grade/batch → weighted, cumulative
+   CGPA report. The CGPA math lives in Go; this file mirrors the rules
+   only for the live preview chips.
    ===================================================================== */
 
 "use strict";
@@ -96,7 +98,6 @@ function bindCountButtons() {
       btn.classList.add("active");
     });
   });
-  // highlight the default
   document.querySelector('.count-btn[data-count="1"]').classList.add("active");
 }
 
@@ -113,6 +114,9 @@ function startBatch() {
   $("grade-form").scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
+/* =====================================================================
+   STEP 2 — per-student forms
+   ===================================================================== */
 function buildStudentForms(n) {
   const wrap = $("student-forms");
   wrap.innerHTML = "";
@@ -123,67 +127,134 @@ function buildStudentForms(n) {
           <span class="sform-title">Student ${i + 1}</span>
           <span class="sform-live" data-live="${i}">—</span>
         </div>
-        <div class="field">
-          <label>Student full name</label>
-          <input type="text" class="st-name" maxlength="120" placeholder="e.g. Ada Lovelace" />
-        </div>
-        <div class="field">
-          <label>Matriculation number</label>
-          <input type="text" class="st-matric" maxlength="40" placeholder="e.g. CSC/2026/0142" />
-        </div>
-        <div class="field">
-          <label>Course scores (0–100) — leave later ones blank if fewer courses</label>
-          <div class="score-grid">
-            ${[1, 2, 3, 4, 5].map((c) => `
-              <div class="score-cell">
-                <span class="score-tag">C${c}</span>
-                <input type="number" class="score-input" min="0" max="100" step="0.5" placeholder="—" aria-label="Student ${i + 1} course ${c} score" />
-              </div>`).join("")}
+        <div class="student-two-col">
+          <div class="field">
+            <label>Student full name</label>
+            <input type="text" class="st-name" maxlength="120" placeholder="e.g. Ada Lovelace" />
           </div>
+          <div class="field">
+            <label>Matriculation number</label>
+            <input type="text" class="st-matric" maxlength="40" placeholder="e.g. CSC/2026/0142" />
+          </div>
+        </div>
+
+        <div class="prior-box">
+          <label class="prior-toggle">
+            <input type="checkbox" class="st-has-prior" />
+            Carry-over student? Add previous semester totals for a cumulative CGPA
+          </label>
+          <div class="prior-fields" hidden>
+            <div class="field">
+              <label>Previous total credit units (ΣCU so far)</label>
+              <input type="number" class="st-prior-cu" min="1" max="600" step="1" placeholder="e.g. 36" />
+            </div>
+            <div class="field">
+              <label>Previous total quality points (ΣQP so far)</label>
+              <input type="number" class="st-prior-qp" min="0" max="3000" step="0.5" placeholder="e.g. 142" />
+            </div>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Courses — code, credit units (1–6) and score (0–100). The CGPA is weighted by units.</label>
+          <div class="course-rows" data-rows></div>
+          <button type="button" class="btn btn-ghost btn-add-course">+ Add course</button>
         </div>
       </div>`);
   }
 
-  // Live per-course grade chips as scores are typed.
-  wrap.querySelectorAll(".score-input").forEach((inp) => {
-    inp.addEventListener("input", () => {
-      const box = inp.closest(".sform");
-      const idx = box.dataset.index;
-      const live = box.querySelector(`[data-live="${idx}"]`);
-      const scores = readScores(box);
-      if (!scores.length) {
-        live.textContent = "—";
-        live.style.color = "";
-        return;
-      }
-      if (scores.some((s) => s < 0 || s > 100)) {
-        live.textContent = "?!";
-        live.style.color = GRADE_COLORS.F;
-        return;
-      }
-      const gpa = scores.reduce((acc, s) => acc + bandFor(s).point, 0) / scores.length;
-      const letters = scores.map((s) => bandFor(s).letter).join("·");
-      live.textContent = `${letters} → ${gpa.toFixed(2)}`;
-      const avgScore = scores.reduce((a, s) => a + s, 0) / scores.length;
-      live.style.color = GRADE_COLORS[bandFor(avgScore).letter];
+  // Per-student wiring: add-course rows, prior toggle, live chips.
+  wrap.querySelectorAll(".sform").forEach((box) => {
+    const rows = box.querySelector("[data-rows]");
+    addCourseRow(rows);
+    box.querySelector(".btn-add-course").addEventListener("click", () => addCourseRow(rows));
+    box.querySelectorAll(".course-rows").forEach((r) => r.addEventListener("input", () => updateLiveChip(box)));
+
+    const toggle = box.querySelector(".st-has-prior");
+    toggle.addEventListener("change", () => {
+      box.querySelector(".prior-fields").hidden = !toggle.checked;
     });
   });
 }
 
-function readScores(formBox) {
-  const marks = [];
-  for (const input of formBox.querySelectorAll(".score-input")) {
-    const raw = input.value.trim();
-    if (raw === "") continue;
-    const n = Number(raw);
-    if (!Number.isFinite(n)) return null;
-    marks.push(n);
+function addCourseRow(rowsEl) {
+  if (rowsEl.children.length >= 5) {
+    toast("Max 5 courses per student.", "err");
+    return;
   }
-  return marks;
+  const idx = rowsEl.children.length;
+  const row = document.createElement("div");
+  row.className = "course-row";
+  row.innerHTML = `
+    <input type="text" class="cr-code" maxlength="20" placeholder="Code e.g. CSC301" aria-label="Course code" />
+    <input type="number" class="cr-units" min="1" max="6" step="1" placeholder="CU" aria-label="Credit units" />
+    <input type="number" class="cr-score" min="0" max="100" step="0.5" placeholder="Score" aria-label="Score" />
+    <span class="cr-grade" title="Per-course grade">—</span>
+    <button type="button" class="cr-remove" title="Remove course" ${idx === 0 ? "disabled" : ""}>×</button>`;
+  row.querySelector(".cr-remove").addEventListener("click", () => {
+    row.remove();
+    refreshRemoveButtons(rowsEl);
+    updateLiveChip(rowsEl.closest(".sform"));
+  });
+  rowsEl.appendChild(row);
+  refreshRemoveButtons(rowsEl);
+}
+
+function refreshRemoveButtons(rowsEl) {
+  rowsEl.querySelectorAll(".cr-remove").forEach((btn, i) => {
+    btn.disabled = rowsEl.children.length === 1;
+  });
+}
+
+// One complete course row, or null if incomplete/invalid.
+function readCourseRow(row) {
+  const code = row.querySelector(".cr-code").value.trim();
+  const unitsRaw = row.querySelector(".cr-units").value.trim();
+  const scoreRaw = row.querySelector(".cr-score").value.trim();
+  if (!code || unitsRaw === "" || scoreRaw === "") return null;
+  const units = Number(unitsRaw);
+  const score = Number(scoreRaw);
+  if (!Number.isFinite(units) || !Number.isFinite(score)) return null;
+  return { code, creditUnits: units, score };
+}
+
+function readCourses(formBox) {
+  const courses = [];
+  for (const row of formBox.querySelectorAll(".course-row")) {
+    const c = readCourseRow(row);
+    if (c) courses.push(c);
+  }
+  return courses;
+}
+
+// Live preview: per-course letters + weighted GPA from units.
+function updateLiveChip(formBox) {
+  const live = formBox.querySelector(".sform-live");
+  const courses = readCourses(formBox);
+  if (!courses.length) {
+    live.textContent = "—";
+    live.style.color = "";
+    return;
+  }
+  const badScore = courses.some((c) => c.score < 0 || c.score > 100);
+  const badUnits = courses.some((c) => c.creditUnits < 1 || c.creditUnits > 6);
+  if (badScore || badUnits) {
+    live.textContent = "?!";
+    live.style.color = GRADE_COLORS.F;
+    return;
+  }
+  const letters = courses.map((c) => bandFor(c.score).letter).join("·");
+  const qp = courses.reduce((acc, c) => acc + c.creditUnits * bandFor(c.score).point, 0);
+  const cu = courses.reduce((acc, c) => acc + c.creditUnits, 0);
+  const gpa = qp / cu;
+  live.textContent = `${letters} → GPA ${gpa.toFixed(2)}`;
+  live.style.color = GRADE_COLORS[bandFor(
+    courses.reduce((a, c) => a + c.score, 0) / courses.length
+  ).letter];
 }
 
 /* =====================================================================
-   STEP 2 — submit the batch
+   STEP 3 — submit the batch
    ===================================================================== */
 function bindSubmit() {
   $("grade-form").addEventListener("submit", async (event) => {
@@ -198,14 +269,28 @@ function bindSubmit() {
     formBoxes.forEach((box, i) => {
       const name = box.querySelector(".st-name").value.trim();
       const matrikNo = box.querySelector(".st-matric").value.trim();
-      const marks = readScores(box) || [];
+      const courses = readCourses(box);
+
+      const num = (sel) => box.querySelector(sel).value.trim();
+      let prior = { previousCreditUnits: 0, previousQualityPoints: 0 };
+      if (box.querySelector(".st-has-prior").checked) {
+        const cu = num(".st-prior-cu");
+        const qp = num(".st-prior-qp");
+        if (cu === "" || qp === "") {
+          problems.push(`Student ${i + 1}: fill both previous totals, or untick carry-over.`);
+        } else {
+          prior = {
+            previousCreditUnits: Number(cu),
+            previousQualityPoints: Number(qp),
+          };
+        }
+      }
 
       if (!name) problems.push(`Student ${i + 1}: name is required.`);
       else if (!matrikNo) problems.push(`Student ${i + 1}: matric number is required.`);
-      else if (!marks.length) problems.push(`Student ${i + 1}: enter at least one course score.`);
-      else if (marks.some((m) => m < 0 || m > 100)) problems.push(`Student ${i + 1}: every score must be 0–100.`);
+      else if (!courses.length) problems.push(`Student ${i + 1}: add at least one complete course (code + units + score).`);
 
-      students.push({ name, matrikNo, marks });
+      students.push({ name, matrikNo, courses, prior });
     });
 
     if (problems.length) {
@@ -229,11 +314,12 @@ function bindSubmit() {
 
       renderDashboard(data);
 
-      const best = [...data.students].sort((a, b) => b.GPA - a.GPA)[0];
+      const best = [...data.students].sort((a, b) => b.CGPA - a.CGPA)[0];
       if (best && best.GradeLeter === "A") confettiBurst();
 
       const gradedNow = data.students.slice(-students.length);
-      toast(`Graded ${gradedNow.length} student(s). Class avg CGPA: ${data.summary.averageGPA.toFixed(2)}`, "ok");
+      const withPrior = gradedNow.filter((s) => s.Attempts > 1).length;
+      toast(`Graded ${gradedNow.length} student(s)` + (withPrior ? ` · ${withPrior} cumulative` : "") + ` · class avg CGPA ${data.summary.averageGPA.toFixed(2)}`, "ok");
     } catch (err) {
       errEl.textContent = err.message;
       errEl.hidden = false;
@@ -246,7 +332,7 @@ function bindSubmit() {
 }
 
 /* =====================================================================
-   STEP 3 — dashboard rendering
+   STEP 4 — dashboard rendering
    ===================================================================== */
 function renderDashboard(data) {
   const s = data.summary;
@@ -265,7 +351,6 @@ function renderDashboard(data) {
   renderDistribution(s.gradeCounts || {});
   renderLeaderboard(data.students);
 
-  // Reveal the top student of the batch in the Result Reveal panel.
   if (data.students.length) {
     showReveal(data.students[data.students.length - 1]);
   }
@@ -279,33 +364,40 @@ function showReveal(student) {
 
   const medal = $("grade-medal");
   medal.className = "grade-medal";
-  void medal.offsetWidth; // restart the pop animation
+  void medal.offsetWidth;
   medal.classList.add("pop", `g-${student.GradeLeter}`);
 
   $("reveal-grade").textContent = student.GradeLeter;
   $("reveal-name").textContent = student.Name;
   $("reveal-matric").textContent = student.MatrikNo;
   $("reveal-verdict").textContent = VERDICTS[student.GradeLeter] || student.GradeLabel || "";
-  $("reveal-gpa").textContent = student.GPA.toFixed(2);
+  $("reveal-gpa").textContent = student.CGPA.toFixed(2);
   $("reveal-avg").textContent = student.AverageMark.toFixed(2);
-  $("reveal-total").textContent = student.TotalMarks.toFixed(2);
+  $("reveal-total").textContent = `${student.TotalQP.toFixed(1)} QP / ${student.TotalCU} CU`;
 
-  $("reveal-courses").textContent = String(student.Marks.length);
+  $("reveal-courses").textContent = String(student.Courses.length);
 
   const ring = $("ring-fg");
-  const frac = Math.max(0, Math.min(1, student.GPA / 5));
+  const frac = Math.max(0, Math.min(1, student.CGPA / 5));
   ring.style.strokeDashoffset = String(326.7 * (1 - frac));
   ring.style.stroke = GRADE_COLORS[student.GradeLeter] || "#00e5ff";
 
   const chips = $("course-chips");
   chips.innerHTML = "";
-  student.CourseGrades.forEach((cg) => {
+  student.Courses.forEach((cg) => {
     const chip = document.createElement("span");
     chip.className = "course-chip";
-    chip.textContent = `${cg.Course}: ${cg.Score} → ${cg.Letter} (${cg.Point})`;
+    chip.textContent = `${cg.Code}: ${cg.CreditUnits}u × ${cg.Letter}(${cg.GradePoint}) = ${cg.QualityPts} QP`;
     chip.style.borderColor = GRADE_COLORS[cg.Letter] + "66";
     chips.appendChild(chip);
   });
+
+  if (student.Attempts > 1) {
+    const tag = document.createElement("span");
+    tag.className = "course-chip cumulative-chip";
+    tag.textContent = `Cumulative ${student.CGPA.toFixed(2)} · incl. prior ${student.Attempts === 2 ? "record" : ""}`;
+    chips.appendChild(tag);
+  }
 }
 
 function renderDistribution(counts) {
@@ -339,10 +431,10 @@ function renderLeaderboard(students) {
       <td>${idx + 1}</td>
       <td>${escapeHtml(s.Name)}</td>
       <td class="mono">${escapeHtml(s.MatrikNo)}</td>
-      <td>${s.TotalMarks.toFixed(1)}</td>
+      <td>${s.TotalCU}</td>
       <td>${s.AverageMark.toFixed(2)}</td>
       <td><span class="pill pill-${s.GradeLeter}">${s.GradeLeter}</span></td>
-      <td class="mono">${s.GPA.toFixed(2)}</td>`;
+      <td class="mono">${s.CGPA.toFixed(2)}</td>`;
     body.appendChild(tr);
   });
 }
@@ -379,9 +471,7 @@ function bindReportActions() {
 }
 
 function bindBatchControls() {
-  // "Set up batch →" — builds the per-student forms for the chosen count.
   $("start-batch").addEventListener("click", startBatch);
-  // "← Change count" — back to the batch-size chooser.
   $("back-btn").addEventListener("click", () => {
     $("grade-form").hidden = true;
     $("batch-box").hidden = false;

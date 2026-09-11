@@ -402,6 +402,51 @@ body {
   background: rgba(255,255,255,0.05);
 }
 
+/* ---------- weighted course entry (code + units + score) ---------- */
+.student-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+@media (max-width: 520px) { .student-two-col { grid-template-columns: 1fr; } }
+
+.prior-box {
+  border: 1px dashed var(--card-border); border-radius: 12px;
+  padding: 12px; margin: 12px 0;
+}
+.prior-toggle {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 0.82rem; color: var(--muted); cursor: pointer;
+}
+.prior-toggle input { accent-color: var(--accent); width: 16px; height: 16px; }
+.prior-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+@media (max-width: 520px) { .prior-fields { grid-template-columns: 1fr; } }
+.prior-fields input {
+  width: 100%; padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.05); border: 1px solid var(--card-border);
+  border-radius: 10px; color: var(--ink); font-family: var(--mono); font-size: 0.9rem;
+}
+.prior-fields input:focus { outline: none; border-color: var(--accent); }
+
+.course-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 64px 76px 40px 28px;
+  gap: 6px; align-items: center; margin-bottom: 6px;
+}
+@media (max-width: 520px) { .course-row { grid-template-columns: minmax(0, 1fr) 54px 64px 34px 24px; } }
+.course-row input {
+  padding: 9px 10px; min-width: 0;
+  background: rgba(255, 255, 255, 0.05); border: 1px solid var(--card-border);
+  border-radius: 10px; color: var(--ink); font-family: var(--mono); font-size: 0.85rem;
+}
+.course-row input:focus { outline: none; border-color: var(--accent); }
+.cr-grade { text-align: center; font-family: var(--mono); font-weight: 700; font-size: 0.9rem; }
+.cr-remove {
+  width: 26px; height: 30px; border-radius: 8px;
+  border: 1px solid var(--card-border); background: transparent;
+  color: var(--muted); cursor: pointer; font-size: 0.9rem; line-height: 1;
+}
+.cr-remove:hover:not(:disabled) { color: var(--red); border-color: var(--red); }
+.cr-remove:disabled { opacity: 0.3; cursor: default; }
+.btn-add-course { margin-top: 8px; }
+.cumulative-chip { border-color: var(--accent) !important; color: var(--accent-2); }
+
 /* ---------- formatted report ---------- */
 .report-pre {
   background: #0a0e1a; border: 1px solid var(--card-border); border-radius: 14px;
