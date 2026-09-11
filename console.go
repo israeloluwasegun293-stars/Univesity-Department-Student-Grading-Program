@@ -2,8 +2,8 @@ package main
 
 // console.go preserves the ORIGINAL terminal-based grading program, now
 // reachable with:  go run . -console
-// The grading switch has been swapped for the shared gradeAndGPA() helper
-// in grades.go so both modes use identical rules.
+// It asks how many students you are calculating for, walks you through
+// every student, and prints the same formatted report the web UI uses.
 
 import (
 	"bufio"
@@ -11,39 +11,45 @@ import (
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/israeloluwasegun293-stars/classedge/grading"
 )
 
 func runConsole() {
-	// demo-sized roster for the terminal experience
-	const rosterSize = 3
-	const courseCount = 2
-
 	consoleReader := bufio.NewScanner(os.Stdin)
-
-	classRoster := make([]StudentRecord, rosterSize)
-	courseNames := [courseCount]string{"Course 1", "Course 2"}
-
-	highestAvg := -1.0
-	lowestAvg := 101.0
-	highestGPA := -1.0
-	lowestGPA := 6.0
 
 	fmt.Println("================================================================")
 	fmt.Println("              STUDENT RESULTS PROCESSING SYSTEM                 ")
 	fmt.Println("================================================================")
-	fmt.Printf("This Project is configured to process data for %d students across %d courses.\n\n", rosterSize, courseCount)
+
+	// Ask how many students to process, with validation.
+	var rosterSize int
+	for {
+		fmt.Printf("How many students are you calculating for? (1-%d): ", grading.MaxStudents)
+		if consoleReader.Scan() {
+			n, err := strconv.Atoi(strings.TrimSpace(consoleReader.Text()))
+			if err == nil && n >= 1 && n <= grading.MaxStudents {
+				rosterSize = n
+				break
+			}
+		}
+		fmt.Printf("INVALID INPUT! Enter a number between 1 and %d.\n", grading.MaxStudents)
+	}
+
+	fmt.Printf("\nThis Project is configured to process data for %d students across up to %d courses.\n\n", rosterSize, grading.MaxCourses)
+
+	classRoster := make([]grading.StudentRecord, 0, rosterSize)
+	metrics := grading.NewClassMetrics()
 
 	for i := 0; i < rosterSize; i++ {
 		fmt.Printf("\n--- Processing Record for Student %d of %d ---\n", i+1, rosterSize)
 
-		var currentStudent StudentRecord
-
+		var name, matric string
 		for {
 			fmt.Print("Enter Student Full Name: ")
 			if consoleReader.Scan() {
-				name := strings.TrimSpace(consoleReader.Text())
+				name = strings.TrimSpace(consoleReader.Text())
 				if name != "" {
-					currentStudent.Name = name
 					break
 				}
 				fmt.Println("Error: Please provide an input, student name cannot be blank.")
@@ -53,77 +59,56 @@ func runConsole() {
 		for {
 			fmt.Print("Enter Matriculation Number: ")
 			if consoleReader.Scan() {
-				matric := strings.TrimSpace(consoleReader.Text())
+				matric = strings.TrimSpace(consoleReader.Text())
 				if matric != "" {
-					currentStudent.MatrikNo = matric
 					break
 				}
 				fmt.Println("Error: Matric number cannot be blank.")
 			}
 		}
 
-		var sum float64 = 0
+		// Ask how many courses for this student.
+		var courseCount int
+		for {
+			fmt.Printf("  How many courses for %s? (1-%d): ", name, grading.MaxCourses)
+			if consoleReader.Scan() {
+				n, err := strconv.Atoi(strings.TrimSpace(consoleReader.Text()))
+				if err == nil && n >= 1 && n <= grading.MaxCourses {
+					courseCount = n
+					break
+				}
+			}
+			fmt.Printf("  INVALID INPUT! Enter a number between 1 and %d.\n", grading.MaxCourses)
+		}
+
+		marks := make([]float64, courseCount)
 		for j := 0; j < courseCount; j++ {
 			for {
-				fmt.Printf("  Enter score for %s (0-100): ", courseNames[j])
+				fmt.Printf("  Enter score for Course %d (0-100): ", j+1)
 				if consoleReader.Scan() {
 					inputStr := strings.TrimSpace(consoleReader.Text())
 					score, err := strconv.ParseFloat(inputStr, 64)
-
 					if err == nil && score >= 0 && score <= 100 {
-						currentStudent.Marks[j] = score
-						sum += score
+						marks[j] = score
 						break
 					}
 				}
-				fmt.Println("INVALID INPUT! Score must be a valid number between 0 and 100.")
+				fmt.Println("  INVALID INPUT! Score must be a valid number between 0 and 100.")
 			}
 		}
 
-		currentStudent.TotalMarks = sum
-		currentStudent.AverageMark = sum / float64(courseCount)
-		currentStudent.GradeLeter, currentStudent.GPA = gradeAndGPA(currentStudent.AverageMark)
-
-		if currentStudent.AverageMark > highestAvg {
-			highestAvg = currentStudent.AverageMark
-		}
-		if currentStudent.AverageMark < lowestAvg {
-			lowestAvg = currentStudent.AverageMark
-		}
-		if currentStudent.GPA > highestGPA {
-			highestGPA = currentStudent.GPA
-		}
-		if currentStudent.GPA < lowestGPA {
-			lowestGPA = currentStudent.GPA
+		rec, err := grading.ProcessStudent(name, matric, marks)
+		if err != nil {
+			fmt.Println(err.Error())
+			i-- // retry this student
+			continue
 		}
 
-		classRoster[i] = currentStudent
+		classRoster = append(classRoster, rec)
+		metrics.Add(rec)
 	}
+	metrics.Finalize()
 
-	fmt.Println("\n\n==========================================================================================")
-	fmt.Println("                                   FINAL ACADEMIC REPORT                                  ")
-	fmt.Println("==========================================================================================")
-	fmt.Printf("%-22s %-15s %-12s %-15s %-8s %-5s\n", "STUDENT NAME", "MATRIC NO", "TOTAL SCORE", "AVERAGE SCORE", "GRADE", "GPA")
-	fmt.Println("------------------------------------------------------------------------------------------")
-
-	for _, student := range classRoster {
-		fmt.Printf("%-22s %-15s %-12.2f %-15.2f %-8s %-5.2f\n",
-			student.Name,
-			student.MatrikNo,
-			student.TotalMarks,
-			student.AverageMark,
-			student.GradeLeter,
-			student.GPA,
-		)
-	}
-	fmt.Println("==========================================================================================")
-
-	fmt.Println("\n==================================================")
-	fmt.Println("              CLASS METRICS SUMMARY               ")
-	fmt.Println("==================================================")
-	fmt.Printf("Highest Average Score:  %6.2f\n", highestAvg)
-	fmt.Printf("Lowest Average Score:   %6.2f\n", lowestAvg)
-	fmt.Printf("Highest Achieved GPA:   %6.2f (5.0 Max Scale)\n", highestGPA)
-	fmt.Printf("Lowest Achieved GPA:    %6.2f\n", lowestGPA)
-	fmt.Println("==================================================")
+	fmt.Println()
+	fmt.Print(grading.FormatClassReport(classRoster, metrics))
 }

@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard — ClassEdge CGPA Command Center</title>
+  <meta name="description" content="Grade one student or a whole class on the standard 5.0 scale — instant reports, class metrics and a leaderboard." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="static/css/style.css" />
+</head>
+<body>
+  <div class="bg-orb orb-a" aria-hidden="true"></div>
+  <div class="bg-orb orb-b" aria-hidden="true"></div>
+
+  <!-- ============ HEADER ============ -->
+  <header class="site-header">
+    <a class="brand" href="/" style="text-decoration:none;color:inherit">
+      <span class="brand-mark">◆</span>
+      <div>
+        <h1>Class<span>Edge</span></h1>
+        <p class="tagline">CGPA Command Center</p>
+      </div>
+    </a>
+    <div class="server-chip" id="server-chip" title="Live status of your Go backend">
+      <span class="dot"></span> <span id="server-status">connecting…</span>
+      <span class="goversion" id="go-version"></span>
+    </div>
+  </header>
+
+  <main class="layout">
+    <!-- ============ STEP 1: BATCH SIZE ============ -->
+    <section class="card form-card" aria-labelledby="form-title">
+      <h2 id="form-title">Grade Students</h2>
+      <p class="muted">Standard 100-point breakdown on the 5.0 scale.</p>
+
+      <!-- Batch size chooser -->
+      <div class="batch-box" id="batch-box">
+        <label for="student-count">How many students are you calculating for?</label>
+        <div class="count-row">
+          <button type="button" class="count-btn" data-count="1">1</button>
+          <button type="button" class="count-btn" data-count="5">5</button>
+          <button type="button" class="count-btn" data-count="10">10</button>
+          <input id="student-count" type="number" min="1" max="100" value="1" aria-label="Number of students" />
+        </div>
+        <button type="button" class="btn btn-primary" id="start-batch">Set up batch →</button>
+      </div>
+
+      <!-- Per-student entry (built by app.js for each student in the batch) -->
+      <form id="grade-form" autocomplete="off" hidden>
+        <div id="student-forms"></div>
+
+        <div class="batch-actions">
+          <button type="button" class="btn btn-ghost" id="back-btn">← Change count</button>
+          <button type="submit" class="btn btn-primary" id="submit-btn">
+            <span class="btn-face">Reveal All Results ⚡</span>
+          </button>
+        </div>
+        <p class="form-error" id="form-error" role="alert" hidden></p>
+      </form>
+
+      <p class="muted small" style="margin-top:12px">
+        <a href="/" class="muted">← What is ClassEdge?</a>
+      </p>
+    </section>
+
+    <!-- ============ RESULT REVEAL (last graded student) ============ -->
+    <section class="card reveal-card" aria-labelledby="reveal-title" aria-live="polite">
+      <h2 id="reveal-title">Result Reveal</h2>
+
+      <div class="reveal-empty" id="reveal-empty">
+        <div class="empty-ring"><span>?</span></div>
+        <p>Submit a batch to trigger the <strong>reveal</strong>.</p>
+      </div>
+
+      <div class="reveal-body" id="reveal-body" hidden>
+        <div class="reveal-top">
+          <div class="grade-medal" id="grade-medal"><span id="reveal-grade">A</span></div>
+          <div class="reveal-meta">
+            <h3 id="reveal-name">Student Name</h3>
+            <p class="muted mono" id="reveal-matric">MATRIC/NO</p>
+            <p class="verdict" id="reveal-verdict">Excellent!</p>
+          </div>
+          <div class="gpa-ring-wrap">
+            <svg class="gpa-ring" viewBox="0 0 120 120" role="img" aria-label="CGPA gauge">
+              <circle class="ring-bg" cx="60" cy="60" r="52" />
+              <circle class="ring-fg" id="ring-fg" cx="60" cy="60" r="52" />
+            </svg>
+            <div class="ring-label">
+              <strong id="reveal-gpa">5.00</strong>
+              <span>CGPA / 5.0</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="reveal-stats">
+          <div class="rstat"><span class="rstat-label">Average</span><strong id="reveal-avg">0.00</strong></div>
+          <div class="rstat"><span class="rstat-label">Total</span><strong id="reveal-total">0.00</strong></div>
+          <div class="rstat"><span class="rstat-label">Courses</span><strong id="reveal-courses">0</strong></div>
+        </div>
+
+        <div class="course-chips" id="course-chips"></div>
+      </div>
+    </section>
+
+    <!-- ============ FORMATTED CLASS REPORT ============ -->
+    <section class="card report-card" aria-labelledby="report-title" id="report-section" hidden>
+      <div class="card-head">
+        <h2 id="report-title">Formatted Class Report</h2>
+        <div class="report-actions">
+          <button class="btn btn-ghost" id="copy-report" type="button">Copy</button>
+          <button class="btn btn-ghost" id="print-report" type="button">Print</button>
+        </div>
+      </div>
+      <pre class="report-pre mono" id="report-pre" aria-label="Formatted class report"></pre>
+    </section>
+
+    <!-- ============ CLASS METRICS ============ -->
+    <section class="card metrics-card" aria-labelledby="metrics-title" hidden id="metrics-section">
+      <div class="card-head">
+        <h2 id="metrics-title">Class Metrics</h2>
+        <button class="btn btn-ghost" id="reset-btn" type="button">Clear roster</button>
+      </div>
+
+      <div class="stats-row">
+        <div class="stat"><span class="stat-num" id="stat-count">0</span><span class="stat-label">Students graded</span></div>
+        <div class="stat"><span class="stat-num gold" id="stat-avg-gpa">0.00</span><span class="stat-label">Class avg CGPA</span></div>
+        <div class="stat"><span class="stat-num green" id="stat-high-avg">0.00</span><span class="stat-label">Highest average</span></div>
+        <div class="stat"><span class="stat-num red" id="stat-low-avg">0.00</span><span class="stat-label">Lowest average</span></div>
+      </div>
+
+      <div class="dist-wrap">
+        <h3 class="dist-title">Grade distribution</h3>
+        <div class="dist-bars" id="dist-bars"></div>
+      </div>
+    </section>
+
+    <!-- ============ LEADERBOARD ============ -->
+    <section class="card table-card" aria-labelledby="table-title" id="table-section" hidden>
+      <div class="card-head">
+        <h2 id="table-title">Leaderboard</h2>
+        <span class="muted small" id="roster-cap">cap 100 · newest first</span>
+      </div>
+      <div class="table-scroll">
+        <table id="roster-table">
+          <thead>
+            <tr><th>#</th><th>Name</th><th>Matric no</th><th>Total</th><th>Avg</th><th>Grade</th><th>CGPA</th></tr>
+          </thead>
+          <tbody id="roster-body"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>Built with <strong>Go</strong> + vanilla JS · dedicated <code>http.NewServeMux()</code> routing · A≥70 · B≥60 · C≥50 · D≥45 · E≥40 · F&lt;40</p>
+  </footer>
+
+  <div class="toast-zone" id="toast-zone" aria-live="assertive"></div>
+  <script src="static/js/app.js"></script>
+</body>
+</html>
