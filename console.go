@@ -71,6 +71,9 @@ func runConsole() {
 		}
 
 		// Prior semesters (for the cumulative CGPA). Enter 0 for a fresh student.
+		// A previous CGPA alone is not enough to merge a semester — the credit
+		// units are the weight — so we always collect ΣCU, plus either the
+		// previous CGPA (TQP is reconstructed as CGPA × TCU) or the exact ΣQP.
 		prior := grading.PriorRecord{}
 		for {
 			fmt.Print("  Previous credit units (from earlier semesters, 0 if none): ")
@@ -84,17 +87,43 @@ func runConsole() {
 			fmt.Println("  INVALID INPUT! Enter 0 or a positive whole number.")
 		}
 		if prior.TotalCreditUnits > 0 {
+			var mode int
 			for {
-				fmt.Print("  Previous total quality points: ")
+				fmt.Print("  Do you know your previous [1] CGPA or [2] total quality points? ")
 				if consoleReader.Scan() {
-					qp, err := strconv.ParseFloat(strings.TrimSpace(consoleReader.Text()), 64)
-					if err == nil && qp >= 0 && qp <= float64(prior.TotalCreditUnits)*5.0 {
-						prior.TotalQualityPoints = qp
+					n, err := strconv.Atoi(strings.TrimSpace(consoleReader.Text()))
+					if err == nil && (n == 1 || n == 2) {
+						mode = n
 						break
 					}
 				}
-				fmt.Printf("  INVALID INPUT! Enter a number between 0 and %.2f (5.0 × credit units).\n",
-					float64(prior.TotalCreditUnits)*5.0)
+				fmt.Println("  INVALID INPUT! Enter 1 or 2.")
+			}
+			if mode == 1 {
+				for {
+					fmt.Print("  Previous CGPA (0.00-5.00): ")
+					if consoleReader.Scan() {
+						g, err := strconv.ParseFloat(strings.TrimSpace(consoleReader.Text()), 64)
+						if err == nil && g > 0 && g <= 5.0 {
+							prior.PreviousCGPA = g
+							break
+						}
+					}
+					fmt.Println("  INVALID INPUT! Enter a CGPA between 0 and 5.0.")
+				}
+			} else {
+				for {
+					fmt.Print("  Previous total quality points: ")
+					if consoleReader.Scan() {
+						qp, err := strconv.ParseFloat(strings.TrimSpace(consoleReader.Text()), 64)
+						if err == nil && qp >= 0 && qp <= float64(prior.TotalCreditUnits)*5.0 {
+							prior.TotalQualityPoints = qp
+							break
+						}
+					}
+					fmt.Printf("  INVALID INPUT! Enter a number between 0 and %.2f (5.0 × credit units).\n",
+						float64(prior.TotalCreditUnits)*5.0)
+				}
 			}
 		}
 

@@ -77,6 +77,44 @@ func TestCumulativeNotAveraged(t *testing.T) {
 	}
 }
 
+// 3b. The previous-CGPA convenience input reconstructs TQP = CGPA × TCU
+// and produces the same cumulative result as supplying exact totals.
+func TestPreviousCGPAConvenienceInput(t *testing.T) {
+	// Exact totals: prior TQP 100 / 20 CU. New: 15 QP / 3 CU → 115/23 = 5.00
+	exact := mustProcess(t, "Ada", "C1", []CourseInput{
+		{Code: "CSC301", CreditUnits: 3, Score: 80},
+	}, PriorRecord{TotalCreditUnits: 20, TotalQualityPoints: 100})
+
+	// Same record via previousCGPA = 100/20 = 5.00 with 20 CU.
+	viaCGPA := mustProcess(t, "Ada", "C1", []CourseInput{
+		{Code: "CSC301", CreditUnits: 3, Score: 80},
+	}, PriorRecord{TotalCreditUnits: 20, PreviousCGPA: 5.0})
+
+	if exact.CGPA != viaCGPA.CGPA {
+		t.Fatalf("CGPA path mismatch: exact %.2f vs via-CGPA %.2f", exact.CGPA, viaCGPA.CGPA)
+	}
+	if viaCGPA.TotalQP != 15 {
+		t.Fatalf("semester totals wrong: QP %.2f", viaCGPA.TotalQP)
+	}
+
+	// Non-trivial: prior CGPA 3.50 over 24 CU → TQP 84; new: 65 → B(4) × 2 CU
+	// = 8 QP → (84 + 8) / (24 + 2) = 92/26 = 3.54
+	rec := mustProcess(t, "Bola", "C2", []CourseInput{
+		{Code: "CSC301", CreditUnits: 2, Score: 65},
+	}, PriorRecord{TotalCreditUnits: 24, PreviousCGPA: 3.5})
+	if rec.CGPA != 3.54 {
+		t.Fatalf("reconstructed cumulative = 92/26, want 3.54, got %.2f", rec.CGPA)
+	}
+
+	// CGPA without units is rejected; both CGPA and QP together is rejected.
+	if _, err := ProcessStudent("Ada", "C1", []CourseInput{{Code: "C", CreditUnits: 3, Score: 50}}, PriorRecord{PreviousCGPA: 4.0}); err == nil {
+		t.Error("CGPA without credit units must be rejected")
+	}
+	if _, err := ProcessStudent("Ada", "C1", []CourseInput{{Code: "C", CreditUnits: 3, Score: 50}}, PriorRecord{TotalCreditUnits: 10, TotalQualityPoints: 30, PreviousCGPA: 4.0}); err == nil {
+		t.Error("CGPA together with explicit QP must be rejected")
+	}
+}
+
 // 4. Carryover / repeat policy: both attempts stay on the record (public
 // university rule); EffectiveCGPA reflects the replacement variant.
 func TestCarryoverBothAttemptsCount(t *testing.T) {

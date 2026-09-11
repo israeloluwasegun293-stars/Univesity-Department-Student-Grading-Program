@@ -144,13 +144,21 @@ function buildStudentForms(n) {
             Carry-over student? Add previous semester totals for a cumulative CGPA
           </label>
           <div class="prior-fields" hidden>
+            <div class="prior-mode">
+              <label class="prior-radio"><input type="radio" name="prior-mode-${i}" class="pm-cgpa" checked /> I know my previous <strong>CGPA</strong></label>
+              <label class="prior-radio"><input type="radio" name="prior-mode-${i}" class="pm-qp" /> I know my previous <strong>quality points</strong></label>
+            </div>
             <div class="field">
               <label>Previous total credit units (ΣCU so far)</label>
               <input type="number" class="st-prior-cu" min="1" max="600" step="1" placeholder="e.g. 36" />
             </div>
-            <div class="field">
+            <div class="field pm-qp-fields" hidden>
               <label>Previous total quality points (ΣQP so far)</label>
               <input type="number" class="st-prior-qp" min="0" max="3000" step="0.5" placeholder="e.g. 142" />
+            </div>
+            <div class="field pm-cgpa-fields">
+              <label>Previous CGPA (on the 5.0 scale)</label>
+              <input type="number" class="st-prior-cgpa" min="0" max="5" step="0.01" placeholder="e.g. 3.75" />
             </div>
           </div>
         </div>
@@ -173,6 +181,15 @@ function buildStudentForms(n) {
     const toggle = box.querySelector(".st-has-prior");
     toggle.addEventListener("change", () => {
       box.querySelector(".prior-fields").hidden = !toggle.checked;
+    });
+
+    // Toggle between the CGPA and quality-points prior modes.
+    box.querySelectorAll(".prior-radio input").forEach((radio) => {
+      radio.addEventListener("change", () => {
+        const useQP = box.querySelector(".pm-qp").checked;
+        box.querySelector(".pm-qp-fields").hidden = !useQP;
+        box.querySelector(".pm-cgpa-fields").hidden = useQP;
+      });
     });
   });
 }
@@ -272,17 +289,26 @@ function bindSubmit() {
       const courses = readCourses(box);
 
       const num = (sel) => box.querySelector(sel).value.trim();
-      let prior = { previousCreditUnits: 0, previousQualityPoints: 0 };
+      let prior = { previousCreditUnits: 0, previousQualityPoints: 0, previousCGPA: 0 };
       if (box.querySelector(".st-has-prior").checked) {
         const cu = num(".st-prior-cu");
-        const qp = num(".st-prior-qp");
-        if (cu === "" || qp === "") {
-          problems.push(`Student ${i + 1}: fill both previous totals, or untick carry-over.`);
+        const useQP = box.querySelector(".pm-qp").checked;
+        if (cu === "") {
+          problems.push(`Student ${i + 1}: previous credit units are always required (they are the weight).`);
+        } else if (useQP) {
+          const qp = num(".st-prior-qp");
+          if (qp === "") {
+            problems.push(`Student ${i + 1}: enter previous quality points, or switch to the CGPA option.`);
+          } else {
+            prior = { previousCreditUnits: Number(cu), previousQualityPoints: Number(qp), previousCGPA: 0 };
+          }
         } else {
-          prior = {
-            previousCreditUnits: Number(cu),
-            previousQualityPoints: Number(qp),
-          };
+          const cgpa = num(".st-prior-cgpa");
+          if (cgpa === "") {
+            problems.push(`Student ${i + 1}: enter previous CGPA, or switch to the quality-points option.`);
+          } else {
+            prior = { previousCreditUnits: Number(cu), previousQualityPoints: 0, previousCGPA: Number(cgpa) };
+          }
         }
       }
 
