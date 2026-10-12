@@ -53,7 +53,7 @@ func main() {
 	fmt.Println("================================================================")
 	fmt.Printf("  Landing page:   http://localhost%s/\n", *addr)
 	fmt.Printf("  Dashboard:      http://localhost%s/app\n", *addr)
-	fmt.Println("  API endpoints:  /api/grade  /api/grade/batch  /api/results  /api/reset")
+	fmt.Println("  API endpoints:  /api/grade  /api/grade/batch  /api/import  /api/export  /api/results")
 	fmt.Println("  Press Ctrl+C to stop.")
 	fmt.Println("================================================================")
 

@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Welcome — ClassEdge</title>
+  <link rel="stylesheet" href="/static/css/style.css" />
+  <style>
+    .welcome-wrap{min-height:calc(100vh - 100px);display:grid;place-items:center;padding:28px}.welcome-card{width:min(100%,900px);padding:clamp(28px,6vw,64px);border:1px solid var(--card-border);border-radius:24px;background:rgba(15,22,38,.9);box-shadow:0 24px 80px #0006}.welcome-label{color:var(--accent-2);font-size:.76rem;letter-spacing:.15em;font-weight:700}.welcome-card h2{font-size:clamp(2rem,5vw,3.8rem);margin:14px 0}.welcome-email{color:var(--muted);overflow-wrap:anywhere}.welcome-actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:32px}.welcome-actions .btn{min-width:190px}.welcome-note{margin-top:42px;padding-top:22px;border-top:1px solid var(--card-border);color:var(--muted);line-height:1.7}.welcome-header{display:flex;align-items:center;justify-content:space-between;padding:18px 5vw}.role-chip{display:inline-block;padding:6px 11px;border-radius:999px;background:#7c5cff22;color:#c7baff;font-size:.76rem;text-transform:uppercase;letter-spacing:.08em;font-weight:700}
+    @media(max-width:560px){.welcome-header{padding:14px 18px}.welcome-header .tagline{display:none}.welcome-actions{flex-direction:column}.welcome-actions .btn{width:100%}}
+  </style>
+</head>
+<body>
+  <div class="bg-orb orb-a" aria-hidden="true"></div><div class="bg-orb orb-b" aria-hidden="true"></div>
+  <header class="welcome-header">
+    <a class="brand" href="/home" style="text-decoration:none;color:inherit"><span class="brand-mark">◆</span><div><h1>Class<span>Edge</span></h1><p class="tagline">CGPA Command Center</p></div></a>
+    <button class="btn btn-ghost btn-small" id="welcome-logout" type="button">Log out</button>
+  </header>
+  <main class="welcome-wrap">
+    <section class="welcome-card">
+      <span class="welcome-label">YOUR CLASS EDGE WORKSPACE</span>
+      <h2>Welcome back.</h2>
+      <p class="welcome-email">Signed in as <strong>{{.Email}}</strong> <span class="role-chip">{{if .IsAdmin}}Administrator{{else}}User{{end}}</span></p>
+      <p class="muted">Choose where you’d like to continue.</p>
+      <div class="welcome-actions">
+        <a class="btn btn-primary" href="/app">Open grading dashboard →</a>
+        {{if .IsAdmin}}<a class="btn btn-ghost" href="/admin">Open Admin Panel</a>{{end}}
+      </div>
+      <p class="welcome-note">Grade one student or manage a full class batch, then review weighted CGPA calculations and export a formatted report.</p>
+    </section>
+  </main>
+  <script>
+    document.getElementById("welcome-logout").addEventListener("click", async () => {
+      try { await fetch("/api/auth/logout", { method: "POST" }); } finally { location.assign("/login"); }
+    });
+  </script>
+</body>
+</html>

@@ -115,8 +115,8 @@ func TestPreviousCGPAConvenienceInput(t *testing.T) {
 	}
 }
 
-// 4. Carryover / repeat policy: both attempts stay on the record (public
-// university rule); EffectiveCGPA reflects the replacement variant.
+// 4. Carryover / repeat policy: both attempts stay on the record. Aggregate
+// prior totals are insufficient to calculate a replacement-policy CGPA.
 func TestCarryoverBothAttemptsCount(t *testing.T) {
 	// Prior includes a failed 3-unit attempt: TQP 30, TCU 10 (GPA 3.00).
 	prior := PriorRecord{TotalCreditUnits: 10, TotalQualityPoints: 30}
@@ -131,12 +131,8 @@ func TestCarryoverBothAttemptsCount(t *testing.T) {
 	if rec.Attempts != 2 {
 		t.Fatalf("carryover student should be flagged Attempts=2, got %d", rec.Attempts)
 	}
-	// Replacement-policy variant: better of the two semester records:
-	// max(30,15)/max(10,3) = 30/10 = 3.00 — hmm, that shows the limitation of
-	// comparing totals; the honest takeaway is documented in the package
-	// comment. Ensure it never exceeds the 5.0 ceiling and stays >= CGPA floor.
-	if rec.EffectiveCGPA < 0 || rec.EffectiveCGPA > 5.0 {
-		t.Fatalf("effective CGPA out of range: %.2f", rec.EffectiveCGPA)
+	if rec.EffectiveCGPA != nil {
+		t.Fatal("effective CGPA must be omitted when only aggregate prior totals are supplied")
 	}
 }
 

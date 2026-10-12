@@ -357,6 +357,39 @@ function bindSubmit() {
   });
 }
 
+function bindImport() {
+  $("import-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    $("form-error").hidden = true;
+    const input = $("import-file");
+    if (!input.files || !input.files.length) {
+      toast("Choose a file to import.", "err");
+      return;
+    }
+    const btn = $("import-btn");
+    const face = btn.querySelector(".btn-face");
+    const original = face.textContent;
+    btn.disabled = true;
+    face.textContent = "Reading file…";
+    try {
+      const form = new FormData();
+      form.append("file", input.files[0]);
+      const data = await api("/api/import", { method: "POST", body: form });
+      renderDashboard(data);
+      toast(`File imported · roster contains ${data.students.length} student(s) · class avg CGPA ${data.summary.averageGPA.toFixed(2)}`, "ok");
+      input.value = "";
+    } catch (err) {
+      toast(err.message, "err");
+      const errEl = $("form-error");
+      errEl.textContent = err.message;
+      errEl.hidden = false;
+    } finally {
+      btn.disabled = false;
+      face.textContent = original;
+    }
+  });
+}
+
 /* =====================================================================
    STEP 4 — dashboard rendering
    ===================================================================== */
@@ -504,6 +537,28 @@ function bindBatchControls() {
   });
 }
 
+function bindEntryChoices() {
+  const choice = $("entry-choice");
+  const manual = $("manual-entry-section");
+  const upload = $("file-import-section");
+  const showChoice = () => {
+    choice.hidden = false;
+    manual.hidden = true;
+    upload.hidden = true;
+  };
+  $("choose-manual").addEventListener("click", () => {
+    choice.hidden = true;
+    upload.hidden = true;
+    manual.hidden = false;
+  });
+  $("choose-file").addEventListener("click", () => {
+    choice.hidden = true;
+    manual.hidden = true;
+    upload.hidden = false;
+  });
+  document.querySelectorAll(".path-back").forEach((button) => button.addEventListener("click", showChoice));
+}
+
 (async function checkHealth() {
   const chip = $("server-chip");
   try {
@@ -520,5 +575,16 @@ function bindBatchControls() {
 bindCountButtons();
 bindBatchControls();
 bindSubmit();
+bindImport();
 bindReset();
 bindReportActions();
+bindEntryChoices();
+
+$("logout-btn").addEventListener("click", async () => {
+  try {
+    await api("/api/auth/logout", { method: "POST" });
+    location.assign("/login");
+  } catch (err) {
+    toast(err.message, "err");
+  }
+});

@@ -273,10 +273,22 @@ body {
 
 .card h2 { font-size: 1.05rem; font-weight: 800; letter-spacing: 0.2px; }
 .card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
-.report-actions { display: flex; gap: 8px; }
+.report-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 
 /* ---------- batch size chooser ---------- */
 .batch-box { margin-top: 18px; }
+.entry-choice { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 22px; }
+.entry-option { display: flex; min-height: 150px; flex-direction: column; align-items: flex-start; justify-content: center; gap: 8px; padding: 18px; border: 1px solid var(--card-border); border-radius: 14px; background: rgba(255,255,255,0.035); color: var(--ink); text-align: left; cursor: pointer; transition: border-color 0.2s, transform 0.2s, background 0.2s; }
+.entry-option:hover { border-color: var(--accent); background: rgba(124,92,255,0.09); transform: translateY(-2px); }
+.entry-option strong { font-size: 1.05rem; }
+.entry-icon { color: var(--accent-2); font-size: 1.7rem; }
+.path-back { margin-top: 16px; }
+.file-import { margin: 20px 0 24px; padding: 16px; border: 1px solid var(--card-border); border-radius: 14px; background: rgba(255,255,255,0.025); }
+.file-import h3 { margin: 0 0 6px; }
+.import-form { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 12px 0; }
+.import-form input[type="file"] { min-width: 0; max-width: 100%; color: var(--muted); }
+.import-form input[type="file"]::file-selector-button { margin-right: 10px; padding: 9px 12px; border: 1px solid var(--card-border); border-radius: 8px; background: var(--bg-2); color: var(--ink); cursor: pointer; }
+.import-form input[type="file"]::file-selector-button:hover { border-color: var(--accent); }
 .batch-box label { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 10px; }
 .count-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
 .count-btn {
@@ -287,6 +299,7 @@ body {
 }
 .count-btn:hover { border-color: var(--accent); }
 .count-btn.active { background: linear-gradient(135deg, var(--accent), #5a3df0); border-color: transparent; }
+@media (max-width: 520px) { .entry-choice { grid-template-columns: 1fr; } }
 #student-count {
   width: 84px; padding: 9px 12px; border-radius: 10px;
   background: rgba(255, 255, 255, 0.05); border: 1px solid var(--card-border);

@@ -14,6 +14,9 @@ import (
 type pageRenderer struct {
 	landing *template.Template
 	app     *template.Template
+	login   *template.Template
+	admin   *template.Template
+	home    *template.Template
 }
 
 func newPageRenderer(content embed.FS) (*pageRenderer, error) {
@@ -25,7 +28,35 @@ func newPageRenderer(content embed.FS) (*pageRenderer, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &pageRenderer{landing: landing, app: app}, nil
+	login, err := template.ParseFS(content, "templates/login.html")
+	if err != nil {
+		return nil, err
+	}
+	admin, err := template.ParseFS(content, "templates/admin.html")
+	if err != nil {
+		return nil, err
+	}
+	home, err := template.ParseFS(content, "templates/home.html")
+	if err != nil {
+		return nil, err
+	}
+	return &pageRenderer{landing: landing, app: app, login: login, admin: admin, home: home}, nil
+}
+
+func (p *pageRenderer) handleLogin(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path != "/login" {
+		http.NotFound(w, r)
+		return
+	}
+	if r.Method != http.MethodGet {
+		w.Header().Set("Allow", "GET")
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if err := p.login.Execute(w, nil); err != nil {
+		http.Error(w, "template error", http.StatusInternalServerError)
+	}
 }
 
 // handleLanding serves the marketing/overview page at "/".
@@ -49,7 +80,45 @@ func (p *pageRenderer) handleApp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := p.app.Execute(w, nil); err != nil {
+	user, _ := currentAccount(r)
+	if err := p.app.Execute(w, map[string]bool{"IsAdmin": user.Role == "admin"}); err != nil {
+		http.Error(w, "template error", http.StatusInternalServerError)
+	}
+}
+
+func (p *pageRenderer) handleAdmin(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path != "/admin" {
+		http.NotFound(w, r)
+		return
+	}
+	if r.Method != http.MethodGet {
+		w.Header().Set("Allow", "GET")
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if err := p.admin.Execute(w, nil); err != nil {
+		http.Error(w, "template error", http.StatusInternalServerError)
+	}
+}
+
+func (p *pageRenderer) handleHome(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path != "/home" {
+		http.NotFound(w, r)
+		return
+	}
+	if r.Method != http.MethodGet {
+		w.Header().Set("Allow", "GET")
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	user, ok := currentAccount(r)
+	if !ok {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if err := p.home.Execute(w, map[string]any{"Email": user.Email, "IsAdmin": user.Role == "admin"}); err != nil {
 		http.Error(w, "template error", http.StatusInternalServerError)
 	}
 }

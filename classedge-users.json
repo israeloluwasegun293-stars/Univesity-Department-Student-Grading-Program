@@ -1,0 +1,22 @@
+{
+  "users": [
+    {
+      "email": "Ijhayclassics",
+      "passwordHash": "$2a$10$sIM9PWI06NdWUcN5v6c6g.HdPPThd1QaNuTmHdKvNESK16v7LRj0G",
+      "role": "admin",
+      "createdAt": "2026-10-12T15:43:51.719102098Z"
+    },
+    {
+      "email": "israeljoshua125@gmail.com",
+      "passwordHash": "$2a$10$Fr30fKCHVdJlmgCxmKuTd.po2wnPWuevEMOsZC.fWIKXzDeO0Aa62",
+      "role": "user",
+      "createdAt": "2026-10-12T15:43:51.719102209Z"
+    },
+    {
+      "email": "israeloluwasegun293@gmail.com",
+      "passwordHash": "$2a$10$E.JfegLhd4gbSDA83boWDeq.SNVRXjxj8IU5twjfe3qF2eJHbPS/i",
+      "role": "admin",
+      "createdAt": "2026-10-12T15:47:49.739645948Z"
+    }
+  ]
+}

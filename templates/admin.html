@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Panel — ClassEdge</title>
+  <link rel="stylesheet" href="/static/css/style.css" />
+  <style>
+    .admin-layout{max-width:1180px;margin:36px auto;padding:0 22px}.admin-heading{display:flex;justify-content:space-between;align-items:center;gap:20px;margin-bottom:22px}.admin-heading h2{margin:0}.admin-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px}.admin-stat{padding:20px;background:rgba(255,255,255,.045);border:1px solid var(--card-border);border-radius:14px}.admin-stat strong{display:block;font:700 1.8rem var(--mono);margin-bottom:6px}.admin-stat span{font-size:.75rem;color:var(--muted);letter-spacing:.08em;text-transform:uppercase}.admin-section{margin:18px 0}.admin-form{display:grid;grid-template-columns:2fr 2fr 1fr auto;gap:12px;align-items:end}.admin-form label{display:block;font-size:.8rem;color:var(--muted);margin-bottom:6px}.admin-form input,.admin-form select,.admin-search,.admin-table select{width:100%;box-sizing:border-box;padding:11px 12px;background:#0b1120;border:1px solid #33405a;border-radius:9px;color:#fff;font:inherit}.admin-search{max-width:360px}.admin-toolbar{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-bottom:14px}.admin-table-wrap{overflow-x:auto}.admin-table{min-width:760px}.admin-table td{vertical-align:middle}.admin-actions{display:flex;gap:7px;align-items:center}.admin-actions .btn{white-space:nowrap}.admin-notice{min-height:24px;margin:10px 0;color:var(--green)}.admin-notice.error{color:var(--red)}.status-badge{display:inline-block;border-radius:999px;padding:4px 9px;font-size:.74rem}.status-active{color:var(--green);background:#34e5a122}.status-disabled{color:var(--red);background:#ff6b8122}.admin-empty{text-align:center;color:var(--muted);padding:24px}
+    @media(max-width:800px){.admin-grid{grid-template-columns:repeat(2,1fr)}.admin-form{grid-template-columns:1fr 1fr}.admin-heading{align-items:flex-start;flex-direction:column}}
+    @media(max-width:520px){.admin-form{grid-template-columns:1fr}.admin-toolbar{align-items:stretch;flex-direction:column}.admin-search{max-width:none}}
+  </style>
+</head>
+<body>
+  <div class="bg-orb orb-a" aria-hidden="true"></div><div class="bg-orb orb-b" aria-hidden="true"></div>
+  <header class="site-header">
+    <a class="brand" href="/app" style="text-decoration:none;color:inherit"><span class="brand-mark">◆</span><div><h1>Class<span>Edge</span></h1><p class="tagline">Administrator Console</p></div></a>
+    <div class="report-actions"><a class="btn btn-ghost btn-small" href="/home">Home</a><a class="btn btn-ghost btn-small" href="/app">Grading dashboard</a><button class="btn btn-ghost btn-small" id="admin-logout" type="button">Log out</button></div>
+  </header>
+  <main class="admin-layout">
+    <div class="admin-heading"><div><p class="muted small">SYSTEM MANAGEMENT</p><h2>Admin Panel</h2><p class="muted">Manage accounts and monitor grading activity.</p></div></div>
+    <section class="admin-grid" aria-label="System overview">
+      <div class="admin-stat"><strong id="stat-users">—</strong><span>Total accounts</span></div>
+      <div class="admin-stat"><strong id="stat-active">—</strong><span>Active accounts</span></div>
+      <div class="admin-stat"><strong id="stat-admins">—</strong><span>Administrators</span></div>
+      <div class="admin-stat"><strong id="stat-students">—</strong><span>Students graded</span></div>
+    </section>
+    <section class="card admin-section">
+      <div class="card-head"><div><h2>Create account</h2><p class="muted small">Add a Gmail user and assign access.</p></div></div>
+      <form class="admin-form" id="new-user-form">
+        <div><label for="new-email">Gmail address</label><input id="new-email" name="email" type="email" placeholder="person@gmail.com" required /></div>
+        <div><label for="new-password">Temporary password</label><input id="new-password" name="password" type="password" maxlength="72" required /><small class="muted">8+ chars with 3 character types, or a 12+ char passphrase.</small></div>
+        <div><label for="new-role">Access role</label><select id="new-role" name="role"><option value="user">User</option><option value="admin">Admin</option></select></div>
+        <button class="btn btn-primary" type="submit">Create user</button>
+      </form>
+      <p class="admin-notice" id="create-notice" role="status" aria-live="polite"></p>
+    </section>
+    <section class="card admin-section">
+      <div class="admin-toolbar"><div><h2>Accounts</h2><p class="muted small">Update access, reset passwords or remove accounts.</p></div><input class="admin-search" id="user-search" type="search" placeholder="Filter by Gmail address…" aria-label="Filter accounts" /></div>
+      <p class="admin-notice" id="table-notice" role="status" aria-live="polite"></p>
+      <div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>Gmail address</th><th>Role</th><th>Status</th><th>Created</th><th>Actions</th></tr></thead><tbody id="users-body"></tbody></table></div>
+      <p id="empty-state" class="admin-empty" hidden>No accounts match this filter.</p>
+    </section>
+  </main>
+  <div class="toast-zone" id="toast-zone" aria-live="assertive"></div>
+  <script src="/static/js/admin.js"></script>
+</body>
+</html>

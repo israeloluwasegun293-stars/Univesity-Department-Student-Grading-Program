@@ -10,8 +10,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
+	"os"
 	"runtime"
 
 	"github.com/israeloluwasegun293-stars/classedge/grading"
@@ -33,19 +35,42 @@ func NewMux(content embed.FS) *http.ServeMux {
 
 	// Pages.
 	mux.HandleFunc("/", pages.handleLanding)
-	mux.HandleFunc("/app", pages.handleApp)
+	mux.HandleFunc("/login", pages.handleLogin)
+	mux.HandleFunc("/app", requireLogin(pages.handleApp))
+	mux.HandleFunc("/home", requireLogin(pages.handleHome))
+	mux.HandleFunc("/admin", requireAdmin(pages.handleAdmin))
+	mux.HandleFunc("/api/auth/status", handleAuthStatus)
+	mux.HandleFunc("/api/auth/register", handleRegister)
+	mux.HandleFunc("/api/auth/login", handleLogin)
+	mux.HandleFunc("/api/auth/logout", handleLogout)
+	mux.HandleFunc("/api/admin/overview", requireAdmin(handleAdminOverview))
+	mux.HandleFunc("/api/admin/users", requireAdmin(handleAdminUsers))
+	mux.HandleFunc("/api/admin/users/{email}", requireAdmin(handleAdminUser))
 
 	// API.
-	mux.HandleFunc("/api/grade", handleGrade)
-	mux.HandleFunc("/api/grade/batch", handleGradeBatch)
-	mux.HandleFunc("/api/results", handleResults)
-	mux.HandleFunc("/api/reset", handleReset)
+	mux.HandleFunc("/api/grade", requireLogin(handleGrade))
+	mux.HandleFunc("/api/grade/batch", requireLogin(handleGradeBatch))
+	mux.HandleFunc("/api/import", requireLogin(handleImport))
+	mux.HandleFunc("/api/export", requireLogin(handleExport))
+	mux.HandleFunc("/api/export/template.csv", requireLogin(handleExportTemplate))
+	mux.HandleFunc("/api/results", requireLogin(handleResults))
+	mux.HandleFunc("/api/reset", requireLogin(handleReset))
 	mux.HandleFunc("/api/health", handleHealth)
 
 	// Embedded static assets.
 	mux.Handle("/static/", secureStatic(http.FileServer(http.FS(assets))))
 
 	return mux
+}
+
+func init() {
+	path := os.Getenv("CLASSEDGE_USER_DB")
+	if path == "" {
+		path = "classedge-users.json"
+	}
+	if err := configureAuth(path); err != nil {
+		log.Fatalf("initialize login database: %v", err)
+	}
 }
 
 var store = newResultStore()
@@ -104,18 +129,8 @@ func handleGradeBatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	r.Body = http.MaxBytesReader(w, r.Body, maxBodyBytes)
-	dec := json.NewDecoder(r.Body)
-	dec.DisallowUnknownFields()
-
 	var req BatchRequest
-	if err := dec.Decode(&req); err != nil {
-		var maxErr *http.MaxBytesError
-		if errors.As(err, &maxErr) {
-			writeJSON(w, http.StatusRequestEntityTooLarge, apiError{"Request body too large (1 MiB max)."})
-			return
-		}
-		writeJSON(w, http.StatusBadRequest, apiError{"Malformed JSON body: " + err.Error()})
+	if !decodeJSON(w, r, &req) {
 		return
 	}
 
@@ -138,9 +153,7 @@ func handleGradeBatch(w http.ResponseWriter, r *http.Request) {
 		records = append(records, rec)
 	}
 
-	for _, rec := range records {
-		store.add(rec)
-	}
+	store.addBatch(records)
 	respondDashboard(w)
 }
 
@@ -196,6 +209,19 @@ func decodeJSON(w http.ResponseWriter, r *http.Request, dst any) bool {
 			return false
 		}
 		writeJSON(w, http.StatusBadRequest, apiError{"Malformed JSON body: " + err.Error()})
+		return false
+	}
+	if err := dec.Decode(new(any)); err != io.EOF {
+		if err == nil {
+			writeJSON(w, http.StatusBadRequest, apiError{"Malformed JSON body: multiple JSON values are not allowed."})
+		} else {
+			var maxErr *http.MaxBytesError
+			if errors.As(err, &maxErr) {
+				writeJSON(w, http.StatusRequestEntityTooLarge, apiError{"Request body too large (1 MiB max)."})
+			} else {
+				writeJSON(w, http.StatusBadRequest, apiError{"Malformed JSON body: " + err.Error()})
+			}
+		}
 		return false
 	}
 	return true

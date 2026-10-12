@@ -27,6 +27,9 @@
       <span class="dot"></span> <span id="server-status">connecting…</span>
       <span class="goversion" id="go-version"></span>
     </div>
+    <a class="btn btn-ghost btn-small" href="/home">Home</a>
+    {{if .IsAdmin}}<a class="btn btn-ghost btn-small" href="/admin">Admin Panel</a>{{end}}
+    <button class="btn btn-ghost btn-small" id="logout-btn" type="button">Log out</button>
   </header>
 
   <main class="layout">
@@ -35,30 +38,60 @@
       <h2 id="form-title">Grade Students</h2>
       <p class="muted">Weighted CGPA: every course needs its <strong>credit units</strong> (1–6). Quality Points = Units × Grade Point; CGPA = ΣQP ÷ ΣCU.</p>
 
-      <!-- Batch size chooser -->
-      <div class="batch-box" id="batch-box">
-        <label for="student-count">How many students are you calculating for?</label>
-        <div class="count-row">
-          <button type="button" class="count-btn" data-count="1">1</button>
-          <button type="button" class="count-btn" data-count="5">5</button>
-          <button type="button" class="count-btn" data-count="10">10</button>
-          <input id="student-count" type="number" min="1" max="100" value="1" aria-label="Number of students" />
-        </div>
-        <button type="button" class="btn btn-primary" id="start-batch">Set up batch →</button>
+      <div id="entry-choice" class="entry-choice">
+        <button type="button" class="entry-option" id="choose-manual">
+          <span class="entry-icon" aria-hidden="true">✎</span>
+          <strong>Enter data manually</strong>
+          <span class="muted small">Fill in student and course details here.</span>
+        </button>
+        <button type="button" class="entry-option" id="choose-file">
+          <span class="entry-icon" aria-hidden="true">⇧</span>
+          <strong>Submit a file</strong>
+          <span class="muted small">Upload a CSV, Excel workbook, or PDF.</span>
+        </button>
       </div>
 
-      <!-- Per-student entry (built by app.js for each student in the batch) -->
-      <form id="grade-form" autocomplete="off" hidden>
-        <div id="student-forms"></div>
-
-        <div class="batch-actions">
-          <button type="button" class="btn btn-ghost" id="back-btn">← Change count</button>
-          <button type="submit" class="btn btn-primary" id="submit-btn">
-            <span class="btn-face">Reveal All Results ⚡</span>
-          </button>
+      <div id="file-import-section" hidden>
+        <button type="button" class="btn btn-ghost btn-small path-back">← Choose another option</button>
+        <div class="file-import">
+          <h3>Import a class file</h3>
+          <p class="muted small">Upload a CSV, Excel workbook (.xlsx), or text-based PDF. Use one row per course; the same student details repeat across their rows.</p>
+          <a class="btn btn-ghost btn-small" href="/api/export/template.csv">Download import template</a>
+          <form id="import-form" class="import-form" enctype="multipart/form-data">
+            <input id="import-file" name="file" type="file" accept=".csv,.xlsx,.pdf,text/csv,application/pdf" required />
+            <button class="btn btn-primary" id="import-btn" type="submit"><span class="btn-face">Import and grade</span></button>
+          </form>
+          <p class="muted small">PDF tables can use aligned columns or pipe separators (|). Scanned PDFs need OCR before upload. Imports are limited to 100 students.</p>
         </div>
-        <p class="form-error" id="form-error" role="alert" hidden></p>
-      </form>
+      </div>
+
+      <div id="manual-entry-section" hidden>
+        <button type="button" class="btn btn-ghost btn-small path-back">← Choose another option</button>
+        <!-- Batch size chooser -->
+        <div class="batch-box" id="batch-box">
+          <label for="student-count">How many students are you calculating for?</label>
+          <div class="count-row">
+            <button type="button" class="count-btn" data-count="1">1</button>
+            <button type="button" class="count-btn" data-count="5">5</button>
+            <button type="button" class="count-btn" data-count="10">10</button>
+            <input id="student-count" type="number" min="1" max="100" value="1" aria-label="Number of students" />
+          </div>
+          <button type="button" class="btn btn-primary" id="start-batch">Set up batch →</button>
+        </div>
+
+        <!-- Per-student entry (built by app.js for each student in the batch) -->
+        <form id="grade-form" autocomplete="off" hidden>
+          <div id="student-forms"></div>
+
+          <div class="batch-actions">
+            <button type="button" class="btn btn-ghost" id="back-btn">← Change count</button>
+            <button type="submit" class="btn btn-primary" id="submit-btn">
+              <span class="btn-face">Reveal All Results ⚡</span>
+            </button>
+          </div>
+          <p class="form-error" id="form-error" role="alert" hidden></p>
+        </form>
+      </div>
 
       <p class="muted small" style="margin-top:12px">
         <a href="/" class="muted">← What is ClassEdge?</a>
@@ -111,6 +144,9 @@
         <div class="report-actions">
           <button class="btn btn-ghost" id="copy-report" type="button">Copy</button>
           <button class="btn btn-ghost" id="print-report" type="button">Print</button>
+          <a class="btn btn-ghost" href="/api/export?format=csv">Download CSV</a>
+          <a class="btn btn-ghost" href="/api/export?format=json">Download JSON</a>
+          <a class="btn btn-ghost" href="/api/export?format=txt">Download TXT</a>
         </div>
       </div>
       <pre class="report-pre mono" id="report-pre" aria-label="Formatted class report"></pre>

@@ -28,9 +28,8 @@
 //     default (the common Nigerian public-university rule). Passing a
 //     retake therefore does not erase the earlier F; callers may pass
 //     prior totals that already include the failed attempt and simply
-//     append the new passing attempt. A best-so-far "effective CGPA"
-//     (as-if the best attempt per course replaced the F) is also
-//     provided for institutions with a replacement policy.
+//     append the new passing attempt. Replacement-policy CGPA needs
+//     course-level history, which aggregate prior totals do not provide.
 package grading
 
 import (
@@ -45,8 +44,9 @@ const (
 	// a student takes at most 5 courses per submission
 	MaxCourses = 5
 	// credit units bounds per course (typical Nigerian university range)
-	MinCreditUnits = 1
-	MaxCreditUnits = 6
+	MinCreditUnits      = 1
+	MaxCreditUnits      = 6
+	MaxPriorCreditUnits = 600
 )
 
 // GradePoint maps each letter grade to its grade point on the 5.0 scale.
@@ -117,16 +117,16 @@ type StudentRecord struct {
 	Name          string        `json:"Name"`
 	MatrikNo      string        `json:"MatrikNo"`
 	Courses       []CourseGrade `json:"Courses"`
-	TotalMarks    float64       `json:"TotalMarks"`    // Σ raw scores (informational)
-	AverageMark   float64       `json:"AverageMark"`   // mean raw score (informational)
-	TotalCU       int           `json:"TotalCU"`       // Σ credit units this submission
-	TotalQP       float64       `json:"TotalQP"`       // Σ quality points this submission
-	SemesterGPA   float64       `json:"SemesterGPA"`   // ΣQP/ΣCU for this submission
-	GradeLeter    string        `json:"GradeLeter"`    // overall letter, from the average %
-	GradeLabel    string        `json:"GradeLabel"`    // Excellent / Very Good / ...
-	CGPA          float64       `json:"CGPA"`          // cumulative, incl. prior record
-	EffectiveCGPA float64       `json:"EffectiveCGPA"` // best-attempt variant (replacement policy)
-	Attempts      int           `json:"Attempts"`      // 1 = fresh, 2 = carryover student
+	TotalMarks    float64       `json:"TotalMarks"`              // Σ raw scores (informational)
+	AverageMark   float64       `json:"AverageMark"`             // mean raw score (informational)
+	TotalCU       int           `json:"TotalCU"`                 // Σ credit units this submission
+	TotalQP       float64       `json:"TotalQP"`                 // Σ quality points this submission
+	SemesterGPA   float64       `json:"SemesterGPA"`             // ΣQP/ΣCU for this submission
+	GradeLeter    string        `json:"GradeLeter"`              // overall letter, from the average %
+	GradeLabel    string        `json:"GradeLabel"`              // Excellent / Very Good / ...
+	CGPA          float64       `json:"CGPA"`                    // cumulative, incl. prior record
+	EffectiveCGPA *float64      `json:"EffectiveCGPA,omitempty"` // unavailable when prior totals lack course-level history
+	Attempts      int           `json:"Attempts"`                // 1 = fresh, 2 = carryover student
 }
 
 // validateCU checks a credit-unit value against the allowed range.
@@ -143,8 +143,15 @@ func validateCU(cu int) error {
 // convenience input into exact quality points. It must be called before
 // the cumulative computation.
 func normalizePrior(p PriorRecord) (PriorRecord, error) {
+	if math.IsNaN(p.TotalQualityPoints) || math.IsInf(p.TotalQualityPoints, 0) ||
+		math.IsNaN(p.PreviousCGPA) || math.IsInf(p.PreviousCGPA, 0) {
+		return p, inputError{"INVALID INPUT! Previous academic totals must be finite numbers."}
+	}
 	if p.TotalCreditUnits < 0 {
 		return p, inputError{"INVALID INPUT! Previous credit units cannot be negative."}
+	}
+	if p.TotalCreditUnits > MaxPriorCreditUnits {
+		return p, inputError{fmt.Sprintf("INVALID INPUT! Previous credit units cannot exceed %d.", MaxPriorCreditUnits)}
 	}
 	if p.TotalQualityPoints < 0 {
 		return p, inputError{"INVALID INPUT! Previous quality points cannot be negative."}
@@ -232,7 +239,7 @@ func ProcessStudent(name, matric string, courses []CourseInput, prior PriorRecor
 			return StudentRecord{}, inputError{fmt.Sprintf("Course %d (%s): %s", j+1, code, err.Error())}
 		}
 		// INVALID INPUT! Score must be a valid number between 0 and 100.
-		if in.Score < 0 || in.Score > 100 {
+		if math.IsNaN(in.Score) || math.IsInf(in.Score, 0) || in.Score < 0 || in.Score > 100 {
 			return StudentRecord{}, inputError{fmt.Sprintf(
 				"Course %d (%s): INVALID INPUT! Score must be a valid number between 0 and 100.", j+1, code)}
 		}
@@ -269,15 +276,12 @@ func ProcessStudent(name, matric string, courses []CourseInput, prior PriorRecor
 		rec.CGPA = round2(qpAll / float64(cuAll))
 	}
 
-	// Effective CGPA under a replacement policy: the stronger of the two
-	// totals (used when an institution replaces a failed attempt with a
-	// passing retake). With no prior record the two agree.
-	if prior.TotalCreditUnits > 0 {
-		bestQP := math.Max(prior.TotalQualityPoints, sumQP)
-		bestCU := math.Max(float64(prior.TotalCreditUnits), float64(sumCU))
-		rec.EffectiveCGPA = round2(bestQP / bestCU)
-	} else {
-		rec.EffectiveCGPA = rec.CGPA
+	// Replacement-policy CGPA cannot be derived from aggregate prior totals:
+	// correctly replacing attempts requires course identity and attempt
+	// history. Omit the value rather than return a fabricated ratio.
+	if prior.TotalCreditUnits == 0 {
+		effective := rec.CGPA
+		rec.EffectiveCGPA = &effective
 	}
 
 	return rec, nil

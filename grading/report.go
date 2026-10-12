@@ -77,7 +77,7 @@ func FormatCourseBreakdown(s StudentRecord) string {
 		"TOTALS", s.TotalCU, "", "", s.TotalQP))
 	b.WriteString(fmt.Sprintf("  Semester GPA:  %.2f / %.2f = %.2f\n", s.TotalQP, float64(s.TotalCU), s.SemesterGPA))
 	if s.Attempts > 1 {
-		b.WriteString(fmt.Sprintf("  Cumulative:    %.2f CGPA incl. prior record (effective %.2f)\n", s.CGPA, s.EffectiveCGPA))
+		b.WriteString(fmt.Sprintf("  Cumulative:    %.2f CGPA incl. prior record\n", s.CGPA))
 	} else {
 		b.WriteString(fmt.Sprintf("  Cumulative:    %.2f CGPA\n", s.CGPA))
 	}
